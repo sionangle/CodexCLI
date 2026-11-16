@@ -23,10 +23,12 @@ $env:NO_COLOR = '1'
 $env:TERM = 'dumb'
 $cargo = Join-Path $env:CARGO_HOME 'bin\cargo.exe'
 $log = Join-Path $run 'commands.log'
-$report = [ordered]@{ status = 'running'; scope = 'stage-2-automated'; profile = $Profile; started_at = [DateTime]::UtcNow.ToString('o'); checks = @(); error = $null }
+$report = [ordered]@{ status = 'running'; scope = 'stage-3-automated'; profile = $Profile; started_at = [DateTime]::UtcNow.ToString('o'); checks = @(); error = $null }
 $gitArguments = @('-c', ('safe.directory=' + $repo.Replace('\', '/')))
 $report['terminal_profile'] = 'FORCE_COLOR=0; NO_COLOR=1; TERM=dumb'
 $report['tui_snapshot_version'] = '0.0.0; actual binaries are checked separately'
+$cacheLease = $null
+$previousCacheLease = $env:CODEX_INTENT_CACHE_LEASE
 
 function Get-SourceState {
     $commit = [string](& git @gitArguments -C $repo rev-parse HEAD)
@@ -53,7 +55,11 @@ function Invoke-Check([string]$Name, [string[]]$Arguments, [int]$MinimumPassed =
     $stdout = Join-Path $run ($logName + '.stdout.log')
     $stderr = Join-Path $run ($logName + '.stderr.log')
     # Avoid PowerShell 5.1 converting ordinary native stderr into terminating errors.
-    $process = Start-Process -FilePath $cargo -ArgumentList $Arguments -WorkingDirectory (Join-Path $repo 'codex-rs') -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    $process = Start-Process -FilePath $cargo -ArgumentList $Arguments -WorkingDirectory (Join-Path $repo 'codex-rs') -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    # Wait for Cargo's checked exit status; Start-Process -Wait also waits for detached test
+    # descendants. Pin the process handle before waiting so PowerShell 5.1 retains ExitCode.
+    $null = $process.Handle
+    $process.WaitForExit()
     $code = $process.ExitCode
     $report.checks += [ordered]@{ name = $Name; exit_code = $code; stdout = $stdout; stderr = $stderr }
     if ($code -ne 0) {
@@ -86,21 +92,36 @@ try {
     $source = Get-SourceState
     $report['commit'] = $source.commit
     $report['source_clean_at_start'] = $source.clean
-    if (-not (Test-Path -LiteralPath $cargo)) { throw 'Rust is missing. Run intent/Prepare-Build.ps1 first.' }
     . (Join-Path $PSScriptRoot 'Build-Environment.ps1')
     Initialize-IntentBuildEnvironment -Repository $repo
+    $cacheLease = Enter-IntentBuildCacheLease
+    $env:CODEX_INTENT_CACHE_LEASE = $cacheLease.Name
+    $cargo = Join-Path $env:CARGO_HOME 'bin\cargo.exe'
+    if (-not (Test-Path -LiteralPath $cargo)) { throw 'Rust is missing. Run intent/Prepare-Build.ps1 first.' }
     # Upstream fixtures create isolated OS temp directories. Placing those below
     # this Git checkout changes project discovery and invalidates projectless tests.
     $report['temporary_directory'] = [IO.Path]::GetTempPath()
     & python.exe (Join-Path $PSScriptRoot 'lockfile.py')
     if ($LASTEXITCODE -ne 0) { throw 'Upstream dependency lock verification failed.' }
     $report.checks += [ordered]@{ name = 'upstream dependency lock'; exit_code = 0 }
+    & python.exe -B (Join-Path $PSScriptRoot 'cache_state.py') --profile $Profile --log (Join-Path $run 'workspace-cache.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Workspace cache provenance could not be established.' }
+    $report.checks += [ordered]@{ name = 'workspace cache provenance'; exit_code = 0 }
     Invoke-Check 'format' @('fmt', '--all', '--', '--check')
     Invoke-Check 'intent rendering regression tests' @('test', '--locked', '-p', 'codex-tui', '--lib', 'intent_') 12
     Invoke-Check 'V2 task state aggregation' @('test', '--locked', '-p', 'codex-tui', '--lib', 'intent_tasks::tests::') 11
     Invoke-Check 'V2 persistent panel integration' @('test', '--locked', '-p', 'codex-tui', '--lib', 'intent_task_panel_tests::') 1
     Invoke-Check 'V2 encrypted description boundary' @('test', '--locked', '-p', 'codex-core', '--lib', 'intent_task_description_never_exposes_encrypted_messages') 1
     Invoke-Check 'V2 protocol and schema contracts' @('test', '--locked', '-p', 'codex-app-server-protocol', '--lib') 323
+    Invoke-Check 'maintenance idle state boundary' @('test', '--locked', '-p', 'codex-app-server-daemon', '--lib', 'intent_maintenance') 1
+    Invoke-Check 'maintenance non-forcing drain' @('test', '--locked', '-p', 'codex-app-server', '--lib', 'intent_daemon_drain') 1
+    Invoke-Check 'maintenance CLI command' @('test', '--locked', '-p', 'codex-cli', '--bin', 'codex', 'intent_quiesce_subcommand_parses') 1
+    $faultLog = Join-Path $run 'maintenance-faults.stderr.log'
+    $faultProcess = Start-Process -FilePath (Get-Command python.exe).Source -ArgumentList @('-W', 'error::ResourceWarning', ('"' + (Join-Path $PSScriptRoot 'test_managed_runtime.py') + '"')) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $run 'maintenance-faults.stdout.log') -RedirectStandardError $faultLog
+    $null = $faultProcess.Handle
+    $faultProcess.WaitForExit()
+    if ($faultProcess.ExitCode -ne 0 -or (Get-Content -LiteralPath $faultLog -Raw) -notmatch 'Ran 4 tests') { throw 'Maintenance fault-injection checks failed or did not run. No candidate can be published.' }
+    $report.checks += [ordered]@{ name = 'maintenance fault injection'; exit_code = 0; log = $faultLog }
     Invoke-Check 'V2 activity preview' @('test', '--locked', '-p', 'codex-tui', '--lib', 'agent_status_') 3
     Invoke-Check 'configuration persistence' @('test', '--locked', '-p', 'codex-tui', '--lib', 'config_panel')
     Invoke-Check 'configuration types' @('test', '--locked', '-p', 'codex-config', '--lib')
@@ -136,6 +157,8 @@ try {
     $report.finished_at = [DateTime]::UtcNow.ToString('o')
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $run 'report.json') -Encoding UTF8
     $env:CODEX_HOME = $originalCodexHome
+    $env:CODEX_INTENT_CACHE_LEASE = $previousCacheLease
+    if ($null -ne $cacheLease) { $cacheLease.Dispose() }
     Pop-Location
     Write-Host "Validation report: $run"
     if ($sourceCheckError) { throw $sourceCheckError }

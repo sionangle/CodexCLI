@@ -1,6 +1,6 @@
 # codex-intent 使用说明
 
-第一阶段便携包已经验证并交付，路径和验证范围见 [STATUS.md](STATUS.md)。运行交付目录中的 `codex-intent.cmd`；不要将内部 `package/bin` 加入 PATH，该目录包含辅助服务需要的 `codex.exe` 别名。第二阶段面板仍在开发中。
+第一、二阶段便携包已经验证并交付，路径和验证范围见 [STATUS.md](STATUS.md)。运行第二阶段交付目录中的 `codex-intent.cmd`；不要将内部 `package/bin` 加入 PATH，该目录包含辅助服务需要的 `codex.exe` 别名。第三阶段维护工具正在验收，流程见 [MAINTENANCE.md](MAINTENANCE.md)。
 
 ## 显示模式
 
@@ -28,7 +28,7 @@ intent_view = true
 
 项目级 `.codex/config.toml`、项目指令和机器管理策略仍按上游规则读取；这是配置来源兼容，不是共享会话数据库。官方版不认识 `tui.intent_view`，请把该字段保存在定制版用户目录，不放入两版共同使用的项目配置或官方用户配置。
 
-验证脚本为每次运行创建单独的临时 `CODEX_HOME`，不访问正式登录或会话。第一阶段交付包输出 `codex-intent 0.169.0+intent.1`；当前第二阶段源码的候选版本为 `0.169.0+intent.2`，尚在验收。
+验证脚本为每次运行创建单独的临时 `CODEX_HOME`，不访问正式登录或会话。版本格式为 `codex-intent <上游版本>+intent.<修订号>`；准确交付版本和源码提交见交付包 `release.json`，也可运行 `codex-intent.cmd --version`。
 
 ## 构建入口
 
@@ -53,4 +53,4 @@ python .\intent\validate_terminal.py <候选包的package目录> --stage 2
 
 终端检查启动真实 CLI 和本机模拟模型，每次单独创建配置与会话。报告记录候选文件哈希和每个场景的原始日志；任何失败都会返回非零，不能作为升级发布依据。
 
-不要只复制 `codex-intent.exe`：程序依赖完整包内的执行服务、代码宿主、Windows 沙箱辅助程序及资源。后续安装和维护工具须保持这个目录结构，并协调后台服务与数据版本。目前升级、切换及回滚工具尚未交付。
+不要只复制 `codex-intent.exe`：程序依赖完整包内的执行服务、代码宿主、Windows 沙箱辅助程序及资源。第三阶段提供保留完整包、协调后台服务并恢复一致数据快照的维护工具，使用方式和验收要求见 [MAINTENANCE.md](MAINTENANCE.md)。管理安装默认数据位于其安装目录的 `d/<代号>`，与便携版的 `%USERPROFILE%\.codex-intent` 分开；`Maintain-Intent.ps1 status` 显示准确配置位置。

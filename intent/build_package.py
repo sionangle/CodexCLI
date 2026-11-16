@@ -15,6 +15,7 @@ from prepare_assets import REPO, WORK, prepare
 from codex_package.layout import build_package_dir, validate_package_dir
 from codex_package.targets import PACKAGE_VARIANTS, TARGET_SPECS, PackageInputs
 from lockfile import verify as verify_lockfile
+from cache_state import refresh as refresh_cache
 
 
 def main():
@@ -41,6 +42,8 @@ def main():
             raise RuntimeError("Candidate baseline does not match workspace version")
         assets = prepare()
         environment = {**os.environ, **assets["environment"]}
+        if not environment.get('CODEX_INTENT_CACHE_LEASE'):
+            raise RuntimeError('Use intent/Build-Intent.ps1 to serialize access to the shared compiler cache.')
         environment["STABLE_GIT_COMMIT"] = subprocess.check_output(
             git + ["rev-parse", "HEAD"],
             cwd=REPO, text=True,
@@ -48,6 +51,8 @@ def main():
         spec = TARGET_SPECS["x86_64-pc-windows-msvc"]
         bins = ["codex", "codex-code-mode-host", "codex-exec-server",
                 "codex-command-runner", "codex-windows-sandbox-setup"]
+        report['workspace_cache'] = refresh_cache(args.profile, run / 'workspace-cache.log')
+        verify_lockfile()
         command = ["cargo", "build", "--locked", "--profile", args.profile, "--target", spec.target]
         for binary in bins:
             command += ["--bin", binary]

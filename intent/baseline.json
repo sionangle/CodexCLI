@@ -3,7 +3,7 @@
   "tag": "rust-v0.169.0",
   "commit": "d32063f96c2dff1dc96af839b3952abb6acfeda4",
   "rust_toolchain": "1.95.0",
-  "custom_revision": 2,
-  "implementation_stage": "stage-1-delivered-stage-2-in-development",
+  "custom_revision": 3,
+  "implementation_stage": "stage-3-release-candidate",
   "release_verified": false
 }

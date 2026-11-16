@@ -55,6 +55,7 @@ pub(crate) struct IntentTask {
     started_ms: Option<i64>,
     completed_ms: Option<i64>,
     duration_ms: Option<i64>,
+    uncertain_end: bool,
     pub(crate) current: String,
     pub(crate) progress: Option<String>,
     progress_id: Option<String>,
@@ -95,6 +96,7 @@ impl IntentTask {
             started_ms: None,
             completed_ms: None,
             duration_ms: None,
+            uncertain_end: false,
             current: "等待任务开始记录".to_string(),
             progress: None,
             progress_id: None,
@@ -155,6 +157,7 @@ impl IntentTask {
             self.started_ms = started_ms;
             self.completed_ms = None;
             self.duration_ms = None;
+            self.uncertain_end = false;
             self.status = TaskStatus::Running;
             if let Some(purpose) = self.pending_purpose.take() {
                 self.purpose = Some(purpose);
@@ -178,12 +181,32 @@ impl IntentTask {
             self.apply_item(&turn.id, item, live_at);
         }
         if !self.status.terminal() {
+            // Upstream normalizes unfinished persisted turns to Interrupted when the live
+            // thread becomes idle. Persistence can lag completion, so this is not an actual
+            // interruption event. Wait for terminal metadata or a live completion instead of
+            // permanently latching the inferred status. Old incomplete history is explicit too.
+            self.uncertain_end = live_at.is_none()
+                && turn.status == TurnStatus::Interrupted
+                && turn.completed_at.is_none()
+                && turn.duration_ms.is_none()
+                && turn.error.is_none();
+            if self.uncertain_end {
+                self.status = TaskStatus::Waiting;
+                self.current = "结束状态尚未确认；等待完整记录".to_string();
+                return;
+            }
             self.status = match turn.status {
                 TurnStatus::InProgress => TaskStatus::Running,
                 TurnStatus::Completed => TaskStatus::Completed,
                 TurnStatus::Failed => TaskStatus::Failed,
                 TurnStatus::Interrupted => TaskStatus::Interrupted,
             };
+            if self.status == TaskStatus::Running {
+                self.current = self
+                    .progress
+                    .clone()
+                    .unwrap_or_else(|| "尚未收到进度".to_string());
+            }
         }
         if self.status.terminal() {
             // Set the end once. Duplicate completions never restart the clock.
@@ -260,6 +283,9 @@ impl IntentTask {
     }
 
     pub(crate) fn elapsed(&self, now_ms: i64) -> String {
+        if self.uncertain_end {
+            return "结束时间未确认".to_string();
+        }
         let duration = if self.status.terminal() {
             self.duration_ms
         } else {

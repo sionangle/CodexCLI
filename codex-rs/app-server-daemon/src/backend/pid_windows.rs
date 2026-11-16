@@ -16,6 +16,46 @@ use tokio::fs;
 use tokio::time::sleep;
 
 impl PidBackend {
+    /// A maintenance drain is bounded, but its timeout is never permission to kill a process.
+    pub(crate) async fn intent_graceful_stop(&self) -> Result<()> {
+        anyhow::ensure!(
+            matches!(self.command_kind, super::PidCommandKind::AppServer { .. }),
+            "maintenance drain requires an app-server"
+        );
+        let Some(record) = self.wait_for_pid_start().await? else {
+            return Ok(());
+        };
+        anyhow::ensure!(
+            self.record_is_active(&record).await?,
+            "daemon identity changed before maintenance"
+        );
+        let Some(process) = Process::open(record.pid)? else {
+            return Ok(());
+        };
+        anyhow::ensure!(
+            process.start_time()? == record.process_start_time,
+            "daemon PID was reused before maintenance"
+        );
+        let home = self
+            .pid_file
+            .parent()
+            .and_then(std::path::Path::parent)
+            .context("daemon pid path has no Codex home")?;
+        let socket = codex_app_server_transport::app_server_control_socket_path(home)?;
+        crate::client::request_shutdown(socket.as_path(), record.pid).await?;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(60);
+        while process.is_running()? {
+            if tokio::time::Instant::now() >= deadline {
+                bail!(
+                    "daemon is still draining; no process was killed and no version may be switched"
+                );
+            }
+            sleep(STOP_POLL_INTERVAL).await;
+        }
+        self.refresh_after_stale_record(&record).await?;
+        Ok(())
+    }
+
     pub(crate) async fn wait_for_ownership(&self) -> Result<()> {
         let deadline = tokio::time::Instant::now() + START_TIMEOUT;
         loop {

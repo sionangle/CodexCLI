@@ -50,13 +50,42 @@ fn intent_tasks_untimed_replay_does_not_invent_duration_or_progress() {
     let mut old = turn("old", 0, TurnStatus::Interrupted);
     old.started_at = None;
     task.apply_turn(&old, None);
-    assert_eq!(task.status, TaskStatus::Interrupted);
-    assert_eq!(task.elapsed(99_000), "时间未记录");
+    assert_eq!(task.status, TaskStatus::Waiting);
+    assert_eq!(task.elapsed(99_000), "结束时间未确认");
     assert!(
         task.lines(99_000)
             .iter()
             .any(|line| line.contains("尚未收到进度"))
     );
+}
+
+#[test]
+fn intent_tasks_inferred_interruption_cannot_latch_before_persisted_completion() {
+    let mut task = IntentTask::new("child", "/root/check_docs");
+    let running = turn("first", 10, TurnStatus::InProgress);
+    task.apply_turn(&running, Some(10_000));
+    let inferred = turn("first", 10, TurnStatus::Interrupted);
+    task.apply_turn(&inferred, None);
+    assert_eq!(task.status, TaskStatus::Waiting);
+    assert!(!task.status.terminal());
+    assert_eq!(task.elapsed(30_000), "结束时间未确认");
+    let mut completed = turn("first", 10, TurnStatus::Completed);
+    completed.completed_at = Some(12);
+    completed.duration_ms = Some(2_345);
+    task.apply_turn(&completed, None);
+    task.apply_turn(&inferred, None);
+    task.apply_turn(&running, Some(40_000));
+    assert_eq!(task.status, TaskStatus::Completed);
+    assert_eq!(task.elapsed(99_000), "0分02秒");
+}
+
+#[test]
+fn intent_tasks_real_interruption_stays_terminal_without_optional_timestamps() {
+    let mut task = IntentTask::new("child", "/root/check_docs");
+    task.apply_turn(&turn("first", 10, TurnStatus::Interrupted), Some(12_000));
+    task.apply_turn(&turn("first", 10, TurnStatus::InProgress), None);
+    assert_eq!(task.status, TaskStatus::Interrupted);
+    assert_eq!(task.elapsed(99_000), "时间未记录");
 }
 
 #[test]

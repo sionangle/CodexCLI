@@ -14,6 +14,8 @@ use backend::windows::try_lock_file;
 mod client;
 mod diagnostics;
 mod install_lock;
+mod intent_maintenance;
+pub use intent_maintenance::quiesce_idle;
 mod launch;
 pub use launch::restart_with_features;
 pub use launch::start_with_features;

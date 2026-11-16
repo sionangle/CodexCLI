@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import tempfile
+import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -17,7 +18,11 @@ from codex_package.v8 import resolve_codex_v8_cargo_env
 
 
 def prepare():
-    cache = WORK / "assets"
+    common = Path(subprocess.check_output(['git', '-c', 'safe.directory=' + REPO.as_posix(),
+                  'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd=REPO, text=True).strip()).resolve()
+    if common.name != '.git':
+        raise RuntimeError('Cannot establish the project binary dependency cache.')
+    cache = common.parent / '.intent-work/assets'
     cache.mkdir(parents=True, exist_ok=True)
     # Upstream's DotSlash downloader uses the process temp directory as its cache root.
     tempfile.tempdir = str(cache)

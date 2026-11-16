@@ -48,6 +48,32 @@ fn shutdown_waits_for_admitted_requests_but_force_remains_available() {
 }
 
 #[test]
+fn intent_daemon_drain_never_forces_on_repeated_requests() {
+    let admission = TurnAdmission::default();
+    let active = admission.subscribe_active();
+    let permit = admission.admit().expect("request admitted");
+    let mut shutdown = ShutdownState::default();
+    for _ in 0..2 {
+        shutdown.on_signal(ShutdownSignal::GracefulOnly, 1, 1, &admission);
+    }
+    assert!(!shutdown.forced());
+    assert!(admission.admit().is_err());
+    assert!(matches!(
+        shutdown.update(1, *active.borrow(), 1),
+        ShutdownAction::Noop
+    ));
+    drop(permit);
+    assert!(matches!(
+        shutdown.update(1, *active.borrow(), 1),
+        ShutdownAction::Noop
+    ));
+    assert!(matches!(
+        shutdown.update(0, *active.borrow(), 1),
+        ShutdownAction::Finish
+    ));
+}
+
+#[test]
 fn log_format_from_env_value_matches_json_values_case_insensitively() {
     assert_eq!(LogFormat::from_env_value(Some("json")), LogFormat::Json);
     assert_eq!(LogFormat::from_env_value(Some("JSON")), LogFormat::Json);

@@ -698,6 +698,9 @@ enum AppServerDaemonSubcommand {
     /// Stop the local app server daemon.
     Stop,
 
+    /// Stop an idle codex-intent daemon without ever forcing active work to exit.
+    IntentQuiesce,
+
     /// Print local CLI and running app-server versions as JSON.
     Version,
 
@@ -1464,6 +1467,10 @@ async fn dispatch_cli(
                     }
                     AppServerDaemonSubcommand::Stop => {
                         print_app_server_daemon_output(AppServerLifecycleCommand::Stop).await?;
+                    }
+                    AppServerDaemonSubcommand::IntentQuiesce => {
+                        let output = codex_app_server_daemon::quiesce_idle().await?;
+                        println!("{}", serde_json::to_string(&output)?);
                     }
                     AppServerDaemonSubcommand::Version => {
                         print_app_server_daemon_output(AppServerLifecycleCommand::Version).await?;
@@ -2514,6 +2521,7 @@ fn app_server_subcommand_name(subcommand: Option<&AppServerSubcommand>) -> &'sta
                 "app-server daemon disable-remote-control"
             }
             AppServerDaemonSubcommand::Stop => "app-server daemon stop",
+            AppServerDaemonSubcommand::IntentQuiesce => "app-server daemon intent-quiesce",
             AppServerDaemonSubcommand::Version => "app-server daemon version",
             AppServerDaemonSubcommand::PidUpdateLoop { .. } => "app-server daemon pid-update-loop",
         },
@@ -4862,6 +4870,17 @@ enabled = true
             app_server_from_args(["codex", "app-server", "daemon", "version"].as_ref()).subcommand,
             Some(AppServerSubcommand::Daemon(AppServerDaemonCommand {
                 subcommand: AppServerDaemonSubcommand::Version
+            }))
+        ));
+    }
+
+    #[test]
+    fn intent_quiesce_subcommand_parses() {
+        assert!(matches!(
+            app_server_from_args(["codex", "app-server", "daemon", "intent-quiesce"].as_ref())
+                .subcommand,
+            Some(AppServerSubcommand::Daemon(AppServerDaemonCommand {
+                subcommand: AppServerDaemonSubcommand::IntentQuiesce
             }))
         ));
     }

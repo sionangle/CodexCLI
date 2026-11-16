@@ -227,7 +227,6 @@ enum ShutdownAction {
 #[derive(Clone, Copy)]
 enum ShutdownSignal {
     Forceable,
-    #[cfg(unix)]
     GracefulOnly,
 }
 
@@ -1175,7 +1174,10 @@ pub async fn run_main_with_transport_options(
                         }
                         match event {
                             TransportEvent::DaemonShutdown => {
-                                shutdown_state.on_signal(ShutdownSignal::Forceable, connections.len(), *running_turn_count_rx.borrow(), &processor.turn_admission);
+                                // Repeated maintenance requests must never turn an idle drain
+                                // into a forced interruption. Ordinary stop retains its explicit
+                                // backend force deadline; intent-quiesce never uses that path.
+                                shutdown_state.on_signal(ShutdownSignal::GracefulOnly, connections.len(), *running_turn_count_rx.borrow(), &processor.turn_admission);
                             }
                             TransportEvent::ConnectionOpened {
                                 connection_id,
