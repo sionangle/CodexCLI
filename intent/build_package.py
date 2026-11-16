@@ -75,6 +75,7 @@ def main():
         build_package_dir(package, version, PACKAGE_VARIANTS["codex"], spec, inputs)
         shutil.copy2(package / "bin/codex.exe", package / "bin/codex-intent.exe")
         shutil.copy2(REPO / "LICENSE", package / "LICENSE")
+        shutil.copy2(REPO / "NOTICE", package / "NOTICE")
         validate_package_dir(package, PACKAGE_VARIANTS["codex"], spec)
         # --version also checks that the separately maintained revision stamp agrees
         # with package metadata before a candidate can enter release validation.
