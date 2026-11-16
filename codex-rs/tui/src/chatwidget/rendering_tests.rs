@@ -75,6 +75,35 @@ fn contains_text(buffer: &Buffer, text: &str) -> bool {
         })
 }
 
+#[test]
+fn intent_active_scrollback_filters_before_measurement_and_paint() {
+    let mut cell = crate::exec_cell::new_active_exec_command(
+        "intent-live".into(),
+        vec!["echo".into(), "hidden_live_command".into()],
+        Vec::new(),
+        codex_app_server_protocol::CommandExecutionSource::Agent,
+        None,
+        false,
+    );
+    cell.append_output("intent-live", &"hidden_live_output\n".repeat(500));
+    for width in [40, 80] {
+        let renderable = TranscriptAreaRenderable {
+            child: &cell,
+            render_mode: HistoryRenderMode::Intent,
+            top: 0,
+            right: 0,
+            persistent_layout: None,
+        };
+        let height = renderable.desired_height(width);
+        assert!(height < 8);
+        let area = Rect::new(0, 0, width, height);
+        let mut buffer = Buffer::empty(area);
+        renderable.render(area, &mut buffer);
+        assert!(!contains_text(&buffer, "hidden_live_command"));
+        assert!(!contains_text(&buffer, "hidden_live_output"));
+    }
+}
+
 #[tokio::test]
 async fn owned_bottom_pane_preserves_draft_cursor_and_read_only_notice() {
     let (mut widget, _sender, _events, _operations) = make_chatwidget_manual_with_sender().await;
@@ -315,6 +344,7 @@ fn active_transcript_preserves_clipped_markdown_hyperlinks() {
     );
     let renderable = TranscriptAreaRenderable {
         child: &cell,
+        render_mode: HistoryRenderMode::Rich,
         top: 1,
         right: 2,
         persistent_layout: None,

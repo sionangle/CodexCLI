@@ -23,7 +23,7 @@ impl App {
         let view = &self.transcript_view;
         match self.chat_widget.history_render_mode() {
             HistoryRenderMode::Raw => None,
-            HistoryRenderMode::Rich => match (
+            HistoryRenderMode::Rich | HistoryRenderMode::Intent => match (
                 self.overlay.as_ref(),
                 view.is_detailed(),
                 view.is_search_editing(),

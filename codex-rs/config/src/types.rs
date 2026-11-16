@@ -933,6 +933,10 @@ pub struct Tui {
     #[serde(default)]
     pub raw_output_mode: bool,
 
+    /// Show tool status without commands, arguments, or output until details are requested.
+    #[serde(default)]
+    pub intent_view: bool,
+
     /// Own the fullscreen transcript, including scrolling, selection, and search.
     /// Defaults to `true`; alternate-screen restrictions take precedence.
     #[serde(default = "default_true")]

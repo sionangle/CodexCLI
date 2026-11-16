@@ -106,6 +106,12 @@ pub(crate) struct PatchFailureCell {
 }
 
 impl HistoryCell for PatchFailureCell {
+    fn intent_hyperlink_lines(&self, _width: u16) -> Vec<HyperlinkLine> {
+        plain_hyperlink_lines(vec![Line::from(
+            "代码修改未成功应用 · 展开详情检查冲突或文件权限",
+        )])
+    }
+
     fn tool_call_labels(&self) -> Vec<String> {
         vec!["Failed to apply patch".into()]
     }

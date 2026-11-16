@@ -13,9 +13,22 @@ impl App {
         tui: &mut tui::Tui,
         preference: ConfigPreference,
     ) {
+        let mut edits = vec![preference.edit()];
+        if matches!(
+            preference,
+            ConfigPreference::Toggle {
+                setting: ConfigToggle::IntentView,
+                ..
+            }
+        ) {
+            edits.push(crate::legacy_core::config::edit::ConfigEdit::SetPath {
+                segments: vec!["tui".into(), "raw_output_mode".into()],
+                value: toml_edit::value(false),
+            });
+        }
         let result =
             ConfigEditsBuilder::for_config_path(self.local_settings.user_config_path.as_path())
-                .with_edits([preference.edit()])
+                .with_edits(edits)
                 .apply()
                 .await;
         if let Err(error) = result {
@@ -68,6 +81,18 @@ impl App {
         preference.adopt(&mut self.local_settings.tui, &resolved.tui);
         self.chat_widget
             .apply_config_preference(preference, &resolved.tui);
+        if matches!(
+            preference,
+            ConfigPreference::Toggle {
+                setting: ConfigToggle::IntentView,
+                ..
+            }
+        ) {
+            self.local_settings.tui.raw_output_mode = false;
+            self.transcript_view
+                .set_presentation(false, self.chat_widget.history_render_mode());
+            self.apply_raw_output_mode(tui, false, false);
+        }
         if matches!(
             preference,
             ConfigPreference::Toggle {

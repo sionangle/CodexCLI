@@ -3709,7 +3709,9 @@ async fn reopen_saved_side_chat(during: DuringOpen) -> Result<()> {
         .lines()
         .filter_map(|row| row.split_once('│').map(|(_, pane)| pane.trim()))
         .find(|row| row.contains("Opening…"));
-    insta::assert_snapshot!(status.expect("opening row"), @"› ◌ Child-only prompt  Opening…");
+    insta::allow_duplicates! {
+        insta::assert_snapshot!(status.expect("opening row"), @"› ◌ Child-only prompt  Opening…");
+    }
     assert_eq!(app.current_displayed_thread_id(), Some(parent));
     // Hold the completed request at the foreground installation boundary. Moving away,
     // cancelling and reselecting the same child must share that request.
@@ -4014,7 +4016,9 @@ async fn reopen_saved_side_chat(during: DuringOpen) -> Result<()> {
         .map(|(_, pane)| pane.trim())
         .find(|line| line.contains("remove it"))
         .unwrap_or_else(|| panic!("expected the archive confirmation in {frame}"));
-    insta::assert_snapshot!(prompt, @"This will remove it from Side chats. Archive “New name”?");
+    insta::allow_duplicates! {
+        insta::assert_snapshot!(prompt, @"This will remove it from Side chats. Archive “New name”?");
+    }
     let enter = TuiEvent::Key(KeyCode::Enter.into());
     boxed_future!(app.handle_tui_event(&mut tui, &mut server, enter)).await?;
     assert_eq!(app.current_displayed_thread_id(), Some(child));

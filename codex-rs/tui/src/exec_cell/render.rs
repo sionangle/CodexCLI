@@ -342,6 +342,26 @@ impl HistoryCell for ExecCell {
             .collect()
     }
 
+    fn intent_hyperlink_lines(&self, _width: u16) -> Vec<HyperlinkLine> {
+        let mut lines = Vec::new();
+        for call in self.iter_calls() {
+            let line = if call.duration.is_none() {
+                "正在执行工具任务".to_owned()
+            } else if let Some(output) = &call.output
+                && output.exit_code != 0
+            {
+                format!(
+                    "命令未成功完成（退出码 {}）· 展开详情查看原因",
+                    output.exit_code
+                )
+            } else {
+                "工具任务已完成".to_owned()
+            };
+            lines.push(Line::from(line));
+        }
+        plain_hyperlink_lines(lines)
+    }
+
     fn raw_lines(&self) -> Vec<Line<'static>> {
         plain_lines(visible_lines(
             self.detailed_hyperlink_lines(u16::MAX, HistoryRenderMode::Raw),

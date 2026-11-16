@@ -15,6 +15,7 @@ pub(crate) enum ConfigToggle {
     Animations,
     AutomaticRecaps,
     CollapseTurnDetails,
+    IntentView,
     ComposerStars,
     CopyOnSelectClearSelection,
     Notifications,
@@ -104,6 +105,7 @@ impl ConfigToggle {
             Self::Animations => ("animations", enabled),
             Self::AutomaticRecaps => ("auto_recap", enabled),
             Self::CollapseTurnDetails => ("collapse_turn_details", enabled),
+            Self::IntentView => ("intent_view", enabled),
             Self::CopyOnSelectClearSelection => ("copy_on_select_clear_selection", enabled),
             Self::PasteDetection => ("disable_paste_burst", !enabled),
             Self::StartInVimMode => ("vim_mode_default", enabled),
@@ -121,6 +123,7 @@ impl ConfigToggle {
             Self::Animations => tui.animations,
             Self::AutomaticRecaps => tui.auto_recap,
             Self::CollapseTurnDetails => tui.collapse_turn_details,
+            Self::IntentView => tui.intent_view,
             Self::ComposerStars => tui.effects.starfield,
             Self::CopyOnSelectClearSelection => tui.copy_on_select_clear_selection,
             Self::Notifications => !matches!(
@@ -142,6 +145,7 @@ impl ConfigToggle {
             Self::CollapseTurnDetails => {
                 target.collapse_turn_details = source.collapse_turn_details
             }
+            Self::IntentView => target.intent_view = source.intent_view,
             Self::ComposerStars => target.effects.starfield = source.effects.starfield,
             Self::CopyOnSelectClearSelection => {
                 target.copy_on_select_clear_selection = source.copy_on_select_clear_selection;

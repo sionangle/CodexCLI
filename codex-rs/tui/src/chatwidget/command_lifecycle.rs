@@ -102,7 +102,11 @@ impl ChatWidget {
                 TerminalTitleStatusKind::WaitingForBackgroundTerminal;
             self.set_status(
                 "Waiting for background terminal".to_string(),
-                command_display.clone(),
+                if self.local_settings.tui.intent_view && !self.raw_output_mode() {
+                    None
+                } else {
+                    command_display.clone()
+                },
                 StatusDetailsCapitalization::Preserve,
                 /*details_max_lines*/ 1,
             );
@@ -257,7 +261,13 @@ impl ChatWidget {
         let processes = self
             .unified_exec_processes
             .iter()
-            .map(|process| process.command_display.clone())
+            .map(|process| {
+                if self.local_settings.tui.intent_view && !self.raw_output_mode() {
+                    "后台任务正在运行".to_owned()
+                } else {
+                    process.command_display.clone()
+                }
+            })
             .collect();
         self.bottom_pane.set_unified_exec_processes(processes);
     }

@@ -1,3 +1,11 @@
+# codex-intent
+
+独立维护的 Codex CLI 定制项目，初始基线为官方 `rust-v0.169.0`。准确 commit 和修订号见 [intent/baseline.json](intent/baseline.json)。定制版使用 `codex-intent` 名称及独立用户数据目录。
+
+定制版的 [当前交付状态](intent/STATUS.md)、[使用与构建说明](intent/USAGE.md)、[验收记录](intent/VALIDATION.md) 位于 `intent/`。当前仍在第一阶段验证，尚未交付正式可运行包。下方保留上游说明供参考，其中的官方安装命令不用于安装这个定制版。
+
+---
+
 <p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer.
 <p align="center">
   <img src="https://github.com/openai/codex/blob/main/.github/codex-cli-splash.png" alt="Codex CLI splash" width="80%" />

@@ -86,7 +86,9 @@ impl StreamingRender {
         self.completed_source_len = 0;
         self.has_inline_visualization_directive = contains_inline_visualization(source);
         self.lines = match (render_mode, inline_visualization_context) {
-            (HistoryRenderMode::Rich, None) if !self.has_inline_visualization_directive => {
+            (HistoryRenderMode::Rich | HistoryRenderMode::Intent, None)
+                if !self.has_inline_visualization_directive =>
+            {
                 let rendered = render_streaming_markdown_agent_with_links_and_cwd(
                     source,
                     width,
@@ -101,7 +103,7 @@ impl StreamingRender {
             }
             _ => {
                 self.has_reference_link_definition = false;
-                if render_mode == HistoryRenderMode::Rich {
+                if render_mode != HistoryRenderMode::Raw {
                     let rendered = render_streaming_markdown_agent_with_links_and_cwd(
                         source,
                         width,
@@ -271,13 +273,15 @@ pub(super) fn render_source_with_list_spacing(
     list_spacing: ListSpacing,
 ) -> Vec<HyperlinkLine> {
     match render_mode {
-        HistoryRenderMode::Rich => render_markdown_agent_with_list_spacing(
-            source,
-            width,
-            Some(cwd),
-            inline_visualization_context,
-            list_spacing,
-        ),
+        HistoryRenderMode::Rich | HistoryRenderMode::Intent => {
+            render_markdown_agent_with_list_spacing(
+                source,
+                width,
+                Some(cwd),
+                inline_visualization_context,
+                list_spacing,
+            )
+        }
         HistoryRenderMode::Raw => plain_hyperlink_lines(raw_lines_from_source(source)),
     }
 }

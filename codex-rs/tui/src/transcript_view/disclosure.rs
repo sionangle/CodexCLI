@@ -54,7 +54,7 @@ impl TranscriptView {
     }
 
     pub(crate) fn is_activity_focused(&self) -> bool {
-        self.disclosure.focused.is_some() && !self.detailed && self.mode == HistoryRenderMode::Rich
+        self.disclosure.focused.is_some() && !self.detailed && self.mode != HistoryRenderMode::Raw
     }
 
     pub(crate) fn clear_activity_focus(&mut self) {
@@ -184,7 +184,7 @@ impl TranscriptView {
         column: u16,
         row: u16,
     ) -> bool {
-        if self.detailed || self.mode != HistoryRenderMode::Rich {
+        if self.detailed || self.mode == HistoryRenderMode::Raw {
             return false;
         }
         let Some(visible) = row
@@ -212,7 +212,7 @@ impl TranscriptView {
         key: KeyEvent,
         cells: &[Arc<dyn HistoryCell>],
     ) -> Option<ViewAction> {
-        if self.detailed || self.mode != HistoryRenderMode::Rich || self.is_search_editing() {
+        if self.detailed || self.mode == HistoryRenderMode::Raw || self.is_search_editing() {
             return None;
         }
         if self.disclosure.keymap.app.focus_activity.is_pressed(key) {

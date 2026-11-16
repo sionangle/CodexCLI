@@ -211,7 +211,13 @@ impl InitializeRequestProcessor {
             }
         }
 
-        let user_agent = get_codex_user_agent();
+        // Daemon probes read the version from this handshake. Keep it aligned with
+        // the custom CLI without changing the user agent sent to model providers.
+        let user_agent = get_codex_user_agent().replacen(
+            &format!("/{} ", env!("CARGO_PKG_VERSION")),
+            &format!("/{} ", crate::intent_version::INTENT_VERSION),
+            1,
+        );
         let response = InitializeResponse {
             user_agent,
             codex_home,

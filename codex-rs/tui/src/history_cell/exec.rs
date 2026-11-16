@@ -145,6 +145,13 @@ pub(crate) struct UnifiedExecProcessDetails {
 }
 
 impl HistoryCell for UnifiedExecProcessesCell {
+    fn intent_hyperlink_lines(&self, _width: u16) -> Vec<HyperlinkLine> {
+        plain_hyperlink_lines(vec![Line::from(format!(
+            "后台终端：{} 个任务 · 完整记录中可查看执行详情",
+            self.processes.len()
+        ))])
+    }
+
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
         if width == 0 {
             return Vec::new();

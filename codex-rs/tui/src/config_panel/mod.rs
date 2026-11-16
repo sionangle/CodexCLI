@@ -447,6 +447,16 @@ fn settings(tui: &Tui, status: ConfigPanelStatus) -> Vec<ConfigSetting> {
             value: ConfigEditor::RightClickPaste.value(tui, status),
         },
     ];
+    settings.push(ConfigSetting {
+        section: ConfigSection::Sessions,
+        label: "Intent view / 意图视图",
+        description: "Hide tool commands and output; turn off for detailed view",
+        keywords: "intent_view intent detailed tools commands output 意图 详细",
+        value: ConfigSettingValue::Toggle {
+            setting: ConfigToggle::IntentView,
+            enabled: ConfigToggle::IntentView.enabled(tui),
+        },
+    });
     if status.transcript_mode.is_owned() {
         settings.push(ConfigSetting {
             section: ConfigSection::Sessions,

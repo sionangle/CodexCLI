@@ -31,6 +31,30 @@ impl AgentStatusHistoryCell {
 }
 
 impl HistoryCell for AgentStatusHistoryCell {
+    fn intent_hyperlink_lines(&self, width: u16) -> Vec<crate::terminal_hyperlinks::HyperlinkLine> {
+        let mut lines = vec![Line::from("子任务活动")];
+        for entry in &self.entries {
+            let title = entry
+                .agent_path
+                .rsplit('/')
+                .next()
+                .unwrap_or("子任务")
+                .replace('_', " ");
+            lines.push(Line::from(format!("  • {title}")));
+            if entry.intent_activity.is_empty() {
+                lines.push(Line::from("    尚未收到进度"));
+            } else {
+                let preview_width = usize::from(width.saturating_sub(4).max(1));
+                for activity in &entry.intent_activity {
+                    for line in textwrap::wrap(activity, preview_width) {
+                        lines.push(Line::from(format!("    {line}")));
+                    }
+                }
+            }
+        }
+        crate::terminal_hyperlinks::plain_hyperlink_lines(lines)
+    }
+
     fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = vec![
             "/subagents".magenta().into(),
@@ -67,6 +91,7 @@ impl HistoryCell for AgentStatusHistoryCell {
 pub(super) struct AgentStatusThreadPreview {
     agent_path: String,
     activity: Vec<String>,
+    intent_activity: Vec<String>,
 }
 
 impl AgentStatusThreadPreview {
@@ -84,6 +109,7 @@ impl AgentStatusThreadPreview {
     ) -> Self {
         let mut seen_item_ids = HashSet::new();
         let mut activity = Vec::new();
+        let mut intent_activity = Vec::new();
         for event in events {
             let item = match event {
                 ThreadBufferedEvent::Notification(notification) => match notification.as_ref() {
@@ -98,17 +124,31 @@ impl AgentStatusThreadPreview {
             if !seen_item_ids.insert(item.id().to_string()) {
                 continue;
             }
-            if let Some(summary) = activity_summary(&item.payload) {
+            // Progress is authored by the assistant, never inferred from tool inputs or counts.
+            if let ThreadItemPayload::AgentMessage { text, .. }
+            | ThreadItemPayload::Plan { text, .. } = &item.payload
+                && let Some(summary) = bounded_summary(text)
+                && intent_activity.len() < AGENT_STATUS_PREVIEW_LINES
+            {
+                intent_activity.push(summary);
+            }
+            if activity.len() < AGENT_STATUS_PREVIEW_ITEMS
+                && let Some(summary) = activity_summary(&item.payload)
+            {
                 activity.push(summary);
-                if activity.len() == AGENT_STATUS_PREVIEW_ITEMS {
-                    break;
-                }
+            }
+            if activity.len() == AGENT_STATUS_PREVIEW_ITEMS
+                && intent_activity.len() == AGENT_STATUS_PREVIEW_LINES
+            {
+                break;
             }
         }
         activity.reverse();
+        intent_activity.reverse();
         Self {
             agent_path,
             activity,
+            intent_activity,
         }
     }
 

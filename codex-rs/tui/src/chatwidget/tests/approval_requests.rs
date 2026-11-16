@@ -5,8 +5,10 @@ use super::*;
 use pretty_assertions::assert_eq;
 
 #[tokio::test]
-async fn exec_approval_emits_proposed_command_and_decision_history() {
+async fn intent_exec_approval_emits_proposed_command_and_decision_history() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
+    chat.local_settings.tui.intent_view = true;
+    assert_eq!(chat.history_render_mode(), HistoryRenderMode::Intent);
 
     // Trigger an exec approval request with a short, single-line command.
     let ev = ExecApprovalRequestEvent {

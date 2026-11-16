@@ -40,6 +40,7 @@ impl ActivityDetails {
             .flat_map(|(_, cell)| {
                 let mut lines = match mode {
                     HistoryRenderMode::Rich => cell.transcript_hyperlink_lines(width),
+                    HistoryRenderMode::Intent => cell.intent_hyperlink_lines(width),
                     HistoryRenderMode::Raw => plain_hyperlink_lines(cell.raw_lines()),
                 };
                 if mode == HistoryRenderMode::Rich && !lines.is_empty() {

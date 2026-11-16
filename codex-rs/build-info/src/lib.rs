@@ -12,6 +12,14 @@ use sha2::Sha256;
 
 static BUILD_INFO: OnceLock<BuildInfo> = OnceLock::new();
 
+/// Fork identity is compiled in, so installer detection cannot select an official updater.
+pub const IS_INTENT_BUILD: bool = true;
+#[path = "../../intent-version.rs"]
+mod intent_version;
+pub use intent_version::INTENT_VERSION;
+pub const INTENT_UPDATE_GUIDANCE: &str =
+    "Use intent/Maintain-Intent.ps1 to validate, switch or roll back codex-intent and its data.";
+
 /// Initialize build information from the commit stamped into the calling executable.
 ///
 /// The environment lookup intentionally expands at the macro call site so Git

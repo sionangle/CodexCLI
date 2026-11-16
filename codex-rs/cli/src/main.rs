@@ -116,14 +116,15 @@ use codex_terminal_detection::TerminalName;
 #[derive(Debug, Parser)]
 #[clap(
     author,
-    version,
+    name = "codex-intent",
+    version = codex_build_info::INTENT_VERSION,
     // If a sub‑command is given, ignore requirements of the default args.
     subcommand_negates_reqs = true,
     // The executable is sometimes invoked via a platform‑specific name like
     // `codex-x86_64-unknown-linux-musl`, but the help output should always use
     // the generic `codex` command name that users run.
-    bin_name = "codex",
-    override_usage = "codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND> [ARGS]"
+    bin_name = "codex-intent",
+    override_usage = "codex-intent [OPTIONS] [PROMPT]\n       codex-intent [OPTIONS] <COMMAND> [ARGS]"
 )]
 struct MultitoolCli {
     #[clap(flatten)]
@@ -806,6 +807,10 @@ fn run_update_action(
     action: UpdateAction,
     cli_executable: Option<&std::path::Path>,
 ) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        !codex_build_info::IS_INTENT_BUILD,
+        codex_build_info::INTENT_UPDATE_GUIDANCE
+    );
     if let UpdateAction::Daemon(source) = action {
         let executable = cli_executable
             .ok_or_else(|| anyhow::anyhow!("Cannot locate the launching Codex CLI"))?;
@@ -889,6 +894,10 @@ fn resolve_windows_update_command_from_path(
 }
 
 fn run_update_command() -> anyhow::Result<()> {
+    anyhow::ensure!(
+        !codex_build_info::IS_INTENT_BUILD,
+        codex_build_info::INTENT_UPDATE_GUIDANCE
+    );
     #[cfg(debug_assertions)]
     {
         anyhow::bail!(
@@ -1424,6 +1433,10 @@ async fn dispatch_cli(
                         from_cli: true,
                         yes,
                     } => {
+                        anyhow::ensure!(
+                            !codex_build_info::IS_INTENT_BUILD,
+                            codex_build_info::INTENT_UPDATE_GUIDANCE
+                        );
                         let result = codex_app_server_daemon::update_from_cli(|request| {
                             daemon_install::confirm_install(request, yes)
                         })
@@ -1466,6 +1479,10 @@ async fn dispatch_cli(
                         check_package_ownership: false,
                         ..
                     } => {
+                        anyhow::ensure!(
+                            !codex_build_info::IS_INTENT_BUILD,
+                            codex_build_info::INTENT_UPDATE_GUIDANCE
+                        );
                         let cli_overrides = root_config_overrides
                             .parse_overrides()
                             .map_err(anyhow::Error::msg)?;

@@ -421,10 +421,8 @@ impl App {
             self.chat_widget.set_raw_output_mode(enabled);
         }
         if tui.is_owned_screen() {
-            self.transcript_view.set_presentation(
-                self.transcript_view.is_detailed(),
-                self.chat_widget.history_render_mode(),
-            );
+            self.transcript_view
+                .sync_render_mode(self.chat_widget.history_render_mode());
             tui.frame_requester().schedule_frame();
             return;
         }

@@ -17,7 +17,9 @@ fn usage_warnings_render_in_both_transcripts_including_composites() {
     for mode in [HistoryRenderMode::Rich, HistoryRenderMode::Raw] {
         let visible = usage.display_hyperlink_lines_for_mode(/*width*/ 28, mode);
         let expected = match mode {
-            HistoryRenderMode::Rich => usage.transcript_hyperlink_lines(/*width*/ 28),
+            HistoryRenderMode::Rich | HistoryRenderMode::Intent => {
+                usage.transcript_hyperlink_lines(/*width*/ 28)
+            }
             HistoryRenderMode::Raw => plain_hyperlink_lines(usage.raw_lines()),
         };
         assert_eq!(visible, expected);

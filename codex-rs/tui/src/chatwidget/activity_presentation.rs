@@ -17,7 +17,7 @@ impl ChatWidget {
     ) -> Option<ActivityTranscriptLines> {
         let active = self.transcript.active_cell.as_deref();
         let mode = self.history_render_mode();
-        let has_activity = mode == HistoryRenderMode::Rich
+        let has_activity = mode != HistoryRenderMode::Raw
             && active.is_some_and(|cell| !cell.activity_ids().is_empty());
         let activity = active.map_or_else(Vec::new, |cell| {
             if expanded && has_activity {

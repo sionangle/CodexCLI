@@ -50,7 +50,9 @@ impl App {
             .map(|connection| format!("Running daemon: {}", connection.version))
             .unwrap_or_else(|| "Not connected to the local background server.".to_string());
         let mut header = vec![Line::from("Daemon".bold()), Line::from(status.dim())];
-        let unavailable = if matches!(
+        let unavailable = if codex_build_info::IS_INTENT_BUILD {
+            Some(codex_build_info::INTENT_UPDATE_GUIDANCE)
+        } else if matches!(
             self.app_server_target,
             AppServerTarget::Remote { .. } | AppServerTarget::Cloud
         ) {
@@ -160,6 +162,11 @@ impl App {
     }
 
     pub(super) fn confirm_daemon_update(&mut self, source: DaemonUpdateSource) {
+        if codex_build_info::IS_INTENT_BUILD {
+            self.chat_widget
+                .add_error_message(codex_build_info::INTENT_UPDATE_GUIDANCE.to_string());
+            return;
+        }
         let Some(executable) = &self.daemon_cli_executable else {
             return;
         };

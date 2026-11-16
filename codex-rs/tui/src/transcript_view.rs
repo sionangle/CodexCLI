@@ -368,7 +368,7 @@ impl TranscriptView {
         let width = area.width;
         let unseen_activity = self.unseen_activity;
         let (summary, expanded) = self.sync_live_tool_summary(cells, collapse_turn_details, active);
-        let disclose = !self.disclosure.live_ids.is_empty() && self.mode == HistoryRenderMode::Rich;
+        let disclose = !self.disclosure.live_ids.is_empty() && self.mode != HistoryRenderMode::Raw;
         let mode = self.mode;
         let lines = |width| {
             let mut lines = active.map_or_else(Vec::new, |c| c.transcript_hyperlink_lines(width));
@@ -472,9 +472,21 @@ impl TranscriptView {
         changed
     }
 
+    /// Synchronize a display preference without carrying full records into intent view.
+    pub(crate) fn sync_render_mode(&mut self, mode: HistoryRenderMode) {
+        let detailed = self.detailed && !(mode == HistoryRenderMode::Intent && self.mode != mode);
+        self.set_presentation(detailed, mode);
+    }
+
+    /// Set an explicitly requested presentation, including opening full records.
     pub(crate) fn set_presentation(&mut self, detailed: bool, mode: HistoryRenderMode) {
         if self.detailed == detailed && self.mode == mode {
             return;
+        }
+        if mode == HistoryRenderMode::Intent && self.mode != mode {
+            self.disclosure.expanded.clear();
+            self.disclosure.focused = None;
+            self.search = Search::default();
         }
         self.selection = None;
         self.select_mode = None;
@@ -801,3 +813,7 @@ mod markdown_copy_tests;
 #[cfg(test)]
 #[path = "transcript_view/copy_on_select_tests.rs"]
 mod copy_on_select_tests;
+
+#[cfg(test)]
+#[path = "transcript_view/intent_tests.rs"]
+mod intent_tests;

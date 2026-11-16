@@ -1,5 +1,8 @@
 //! Managed app-server lifecycle, serialized across CLI invocations and the updater.
 
+#[path = "../../intent-version.rs"]
+mod intent_version;
+
 mod backend;
 mod background_command;
 #[cfg(windows)]
@@ -976,7 +979,7 @@ impl Daemon {
             managed_codex_path: managed.managed_codex_bin,
             managed_codex_version,
             socket_path: self.socket_path.clone(),
-            cli_version: env!("CARGO_PKG_VERSION").to_string(),
+            cli_version: intent_version::INTENT_VERSION.to_string(),
             app_server_version: info.app_server_version,
         })
     }
@@ -1205,7 +1208,7 @@ impl Daemon {
             managed_codex_path: self.managed_codex_bin.clone(),
             managed_codex_version,
             socket_path: self.socket_path.clone(),
-            cli_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            cli_version: Some(intent_version::INTENT_VERSION.to_string()),
             app_server_version,
         }
     }
@@ -1222,7 +1225,7 @@ impl Daemon {
             backend,
             remote_control_enabled,
             socket_path: self.socket_path.clone(),
-            cli_version: env!("CARGO_PKG_VERSION").to_string(),
+            cli_version: intent_version::INTENT_VERSION.to_string(),
             app_server_version,
         }
     }

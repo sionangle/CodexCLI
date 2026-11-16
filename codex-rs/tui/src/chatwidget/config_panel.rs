@@ -112,6 +112,11 @@ impl ChatWidget {
             ConfigToggle::StatusLineColors => {
                 self.status_surface_overrides.status_line_use_colors = None;
             }
+            ConfigToggle::IntentView => {
+                // Reuse the existing live renderer switch and invalidate active layout caches.
+                self.set_raw_output_mode(false);
+                self.bump_active_cell_revision();
+            }
             ConfigToggle::AutomaticRecaps
             | ConfigToggle::CollapseTurnDetails
             | ConfigToggle::CopyOnSelectClearSelection
@@ -122,7 +127,7 @@ impl ChatWidget {
         if setting == ConfigToggle::Animations
             && let Some(pet) = self.ambient_pet.as_mut()
         {
-            pet.set_animations_enabled(tui.animations);
+            pet.set_animations_enabled(self.local_settings.tui.animations);
         }
     }
 
@@ -157,6 +162,7 @@ impl ChatWidget {
                 }
                 ConfigToggle::AutomaticRecaps
                 | ConfigToggle::CollapseTurnDetails
+                | ConfigToggle::IntentView
                 | ConfigToggle::CopyOnSelectClearSelection
                 | ConfigToggle::Notifications
                 | ConfigToggle::PasteDetection

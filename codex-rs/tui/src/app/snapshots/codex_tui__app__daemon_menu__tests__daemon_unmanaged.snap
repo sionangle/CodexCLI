@@ -5,10 +5,12 @@ expression: "render_bottom_popup(&app.chat_widget, 80)"
 ---
   Daemon
   Running daemon: v0.153.0
+  Use intent/Maintain-Intent.ps1 to validate, switch or roll back codex-intent
+  and its data.
 
 
-› 1. Install latest public stable
-  2. Use this CLI build
+›    Install latest public stable
+     Use this CLI build
      Restart background server (disabled)  Codex hasn't verified it manages this
                                            server. Restart it where it was
                                            started.

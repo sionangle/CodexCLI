@@ -5298,6 +5298,11 @@
           "description": "Own the fullscreen transcript, including scrolling, selection, and search. Defaults to `true`; alternate-screen restrictions take precedence.",
           "type": "boolean"
         },
+        "intent_view": {
+          "default": false,
+          "description": "Show tool status without commands, arguments, or output until details are requested.",
+          "type": "boolean"
+        },
         "keymap": {
           "allOf": [
             {

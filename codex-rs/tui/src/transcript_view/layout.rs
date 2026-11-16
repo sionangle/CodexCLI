@@ -70,6 +70,8 @@ fn cell_content_layout(
             ActivityTranscriptLines {
                 activity: if presentation.expanded {
                     cell.expanded_hyperlink_lines(width)
+                } else if mode == HistoryRenderMode::Intent {
+                    cell.intent_hyperlink_lines(width)
                 } else {
                     cell.compact_hyperlink_lines(width)
                 },
@@ -97,7 +99,7 @@ fn cell_content_layout(
 }
 
 fn is_rich_user_prompt(cell: &dyn HistoryCell, mode: HistoryRenderMode) -> bool {
-    mode == HistoryRenderMode::Rich && cell.as_any().is::<crate::history_cell::UserHistoryCell>()
+    mode != HistoryRenderMode::Raw && cell.as_any().is::<crate::history_cell::UserHistoryCell>()
 }
 
 #[derive(Default)]
@@ -145,7 +147,7 @@ impl TranscriptView {
         mode: HistoryRenderMode,
     ) -> CellPresentation {
         let ids = cell.activity_ids();
-        let disclosure = !self.detailed && mode == HistoryRenderMode::Rich && !ids.is_empty();
+        let disclosure = !self.detailed && mode != HistoryRenderMode::Raw && !ids.is_empty();
         let manually_expanded = self.disclosure.is_expanded(&ids);
         let reveal_image = ids.is_empty() || manually_expanded || self.detailed;
         if manually_expanded {
@@ -161,7 +163,7 @@ impl TranscriptView {
             detailed: full_content,
             image_protocol: self
                 .image_protocol
-                .filter(|_| mode == HistoryRenderMode::Rich && reveal_image),
+                .filter(|_| mode != HistoryRenderMode::Raw && reveal_image),
         }
     }
 

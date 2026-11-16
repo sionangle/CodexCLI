@@ -173,6 +173,23 @@ impl DynamicToolCallData {
 }
 
 impl HistoryCell for DynamicToolCallCell {
+    fn intent_hyperlink_lines(&self, _width: u16) -> Vec<HyperlinkLine> {
+        let data = self
+            .data
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let text = if data.interrupted {
+            "工具调用已中断 · 展开详情查看记录"
+        } else {
+            match data.status {
+                DynamicToolCallStatus::InProgress => "正在执行工具任务",
+                DynamicToolCallStatus::Completed => "工具任务已完成",
+                DynamicToolCallStatus::Failed => "工具调用失败 · 展开详情查看原因",
+            }
+        };
+        plain_hyperlink_lines(vec![Line::from(text)])
+    }
+
     fn tool_call_labels(&self) -> Vec<String> {
         let data = self
             .data

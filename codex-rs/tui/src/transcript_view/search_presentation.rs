@@ -1,5 +1,6 @@
-//! Search full sources without changing manual disclosure state. Only the current match supplies
-//! an expanded display layout; retained reading snapshots keep their original display layouts.
+//! Search full sources in detailed views without changing manual disclosure state. Intent view
+//! searches only visible content until details are explicitly opened. Retained reading snapshots
+//! keep their original display layouts.
 
 use super::*;
 
@@ -61,7 +62,7 @@ impl TranscriptView {
         key: Option<ActiveCellTranscriptKey>,
         lines: impl FnOnce(u16) -> Option<Vec<HyperlinkLine>>,
     ) -> bool {
-        if !self.search.is_active() || self.detailed {
+        if !self.search.is_active() || self.detailed || self.mode == HistoryRenderMode::Intent {
             return false;
         }
         let next = key.map(|key| (width, key));
@@ -79,7 +80,7 @@ impl TranscriptView {
         changed
     }
 
-    pub(super) fn search_layout(
+    pub(in crate::transcript_view) fn search_layout(
         &mut self,
         cells: &[Arc<dyn HistoryCell>],
         anchor: Anchor,
@@ -109,7 +110,11 @@ impl TranscriptView {
             // A candidate replaces the current match when found, so its spacing must not
             // depend on an expansion that will disappear at that point.
             let current = self.search.current.take();
-            let layout = self.entry_layout(cells, anchor.index, /*full_content*/ true);
+            let layout = self.entry_layout(
+                cells,
+                anchor.index,
+                /*full_content*/ self.mode != HistoryRenderMode::Intent,
+            );
             self.search.current = current;
             layout?
         };

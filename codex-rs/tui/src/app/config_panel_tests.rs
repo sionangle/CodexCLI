@@ -8,6 +8,7 @@ use crate::chatwidget::tests::make_chatwidget_manual_with_sender;
 use crate::chatwidget::tests::render_bottom_popup;
 use crate::config_panel::ConfigEditor;
 use crate::config_panel::ConfigEditorHandoff;
+use crate::history_cell::HistoryRenderMode;
 use crate::local_settings::LocalSettings;
 use codex_protocol::config_types::TrustLevel;
 use pretty_assertions::assert_eq;
@@ -30,6 +31,49 @@ fn next_config_preference(rx: &mut UnboundedReceiver<AppEvent>) -> Result<Config
         panic!("expected config preference save");
     };
     Ok(preference)
+}
+
+#[tokio::test]
+async fn intent_view_persists_and_reflows_when_switching_from_full_records() -> Result<()> {
+    let mut app = make_test_app().await;
+    let mut tui = crate::tui::test_support::make_test_tui()?;
+    app.chat_widget.set_raw_output_mode(true);
+    app.transcript_view
+        .set_presentation(true, HistoryRenderMode::Raw);
+    for enabled in [true, false, true] {
+        app.save_config_preference(
+            &mut tui,
+            ConfigPreference::Toggle {
+                setting: ConfigToggle::IntentView,
+                enabled,
+            },
+        )
+        .await;
+        assert_eq!(app.local_settings.tui.intent_view, enabled);
+        assert!(!app.local_settings.tui.raw_output_mode);
+        assert!(!app.transcript_view.is_detailed());
+        assert_eq!(
+            app.chat_widget.history_render_mode(),
+            if enabled {
+                HistoryRenderMode::Intent
+            } else {
+                HistoryRenderMode::Rich
+            }
+        );
+        // Resolve a new configuration from disk, as a later CLI launch would.
+        let restored = ConfigBuilder::default()
+            .codex_home(app.config.codex_home.to_path_buf())
+            .harness_overrides(ConfigOverrides {
+                cwd: Some(app.launch_cwd.clone()),
+                ..Default::default()
+            })
+            .loader_overrides(LoaderOverrides::without_managed_config_for_tests())
+            .build()
+            .await?;
+        assert_eq!(restored.tui_intent_view, enabled);
+        assert!(!restored.tui_raw_output_mode);
+    }
+    Ok(())
 }
 
 #[tokio::test]

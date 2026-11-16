@@ -303,7 +303,7 @@ impl TranscriptView {
             || active.map_or_else(Vec::new, HistoryCell::activity_ids),
             |row| row.ids().to_vec(),
         );
-        let expanded = self.sync_live_activity(cells, ids) && self.mode == HistoryRenderMode::Rich;
+        let expanded = self.sync_live_activity(cells, ids) && self.mode != HistoryRenderMode::Raw;
         (summary, expanded)
     }
 

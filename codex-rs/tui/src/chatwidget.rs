@@ -1708,6 +1708,8 @@ impl ChatWidget {
     pub(crate) fn history_render_mode(&self) -> HistoryRenderMode {
         if self.raw_output_mode {
             HistoryRenderMode::Raw
+        } else if self.local_settings.tui.intent_view {
+            HistoryRenderMode::Intent
         } else {
             HistoryRenderMode::Rich
         }
@@ -1716,6 +1718,21 @@ impl ChatWidget {
     pub(crate) fn set_raw_output_mode(&mut self, enabled: bool) {
         self.raw_output_mode = enabled;
         self.local_settings.tui.raw_output_mode = enabled;
+        self.sync_unified_exec_footer();
+        if self.local_settings.tui.intent_view
+            && !enabled
+            && matches!(
+                self.status_state.terminal_title_status_kind,
+                TerminalTitleStatusKind::WaitingForBackgroundTerminal
+            )
+        {
+            self.set_status(
+                "等待后台任务".into(),
+                None,
+                StatusDetailsCapitalization::Preserve,
+                1,
+            );
+        }
         let render_mode = self.history_render_mode();
         if let Some(controller) = self.stream_controller.as_mut() {
             controller.set_render_mode(render_mode);

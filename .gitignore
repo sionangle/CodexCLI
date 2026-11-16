@@ -94,3 +94,6 @@ CHANGELOG.ignore.md
 # Python bytecode files
 __pycache__/
 *.pyc
+
+# Isolated codex-intent toolchains, test homes, build output and validation logs.
+/.intent-work/

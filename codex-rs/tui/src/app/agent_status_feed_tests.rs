@@ -5,6 +5,51 @@ use codex_app_server_protocol::ItemCompletedNotification;
 use codex_utils_absolute_path::AbsolutePathBuf;
 
 #[test]
+fn agent_status_retains_authored_progress_after_tools() {
+    let mut store = ThreadEventStore::new(16);
+    store.push_notification(ServerNotification::ItemCompleted(
+        ItemCompletedNotification::new(
+            "child".into(),
+            "turn".into(),
+            ThreadItemPayload::AgentMessage {
+                moderation: None,
+                id: "progress".into(),
+                text: "Checking the freeze logic.".into(),
+                phase: None,
+                memory_citation: None,
+                delivery: None,
+                questions: None,
+            },
+            None,
+            1,
+        ),
+    ));
+    for index in 0..8 {
+        store.push_notification(ServerNotification::ItemCompleted(
+            ItemCompletedNotification::new(
+                "child".into(),
+                "turn".into(),
+                ThreadItemPayload::DynamicToolCall {
+                    id: format!("tool-{index}"),
+                    namespace: None,
+                    tool: "exec".into(),
+                    arguments: serde_json::json!({"command": "hidden_command"}),
+                    status: codex_app_server_protocol::DynamicToolCallStatus::Completed,
+                    content_items: None,
+                    success: Some(true),
+                    duration_ms: Some(1),
+                },
+                None,
+                index + 2,
+            ),
+        ));
+    }
+    let preview = AgentStatusThreadPreview::from_store("/root/check_freeze".into(), &store);
+    assert_eq!(preview.intent_activity, vec!["Checking the freeze logic."]);
+    assert_eq!(preview.activity.len(), AGENT_STATUS_PREVIEW_ITEMS);
+}
+
+#[test]
 fn agent_status_uses_bounded_buffered_activity() {
     let mut store = ThreadEventStore::new(/*capacity*/ 8);
     store.push_notification(ServerNotification::ItemCompleted(
@@ -53,6 +98,16 @@ fn agent_status_uses_bounded_buffered_activity() {
 
     let preview = AgentStatusThreadPreview::from_store("/root/reviewer".to_string(), &store);
     let cell = AgentStatusHistoryCell::new(vec![preview]);
+    let intent = cell
+        .intent_hyperlink_lines(80)
+        .iter()
+        .map(|line| line.line.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(intent.contains("Finished checking"));
+    assert!(!intent.contains("cargo test"));
+    assert!(!intent.contains("unbounded output"));
+    assert!(!intent.contains("/root/"));
     let rendered = cell
         .display_lines(/*width*/ 80)
         .iter()

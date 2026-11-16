@@ -171,6 +171,7 @@ impl ChatWidget {
         let active_cell_renderable = match &self.transcript.active_cell {
             Some(cell) => RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                 child: cell.as_ref(),
+                render_mode: self.history_render_mode(),
                 // The initial header becomes the first history cell, which has no leading separator.
                 top: if cell.as_any().is::<history_cell::SessionHeaderHistoryCell>() {
                     0
@@ -205,6 +206,7 @@ impl ChatWidget {
                 /*flex*/ 1,
                 RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                     child: cell.as_ref(),
+                    render_mode: self.history_render_mode(),
                     top: 1,
                     right: active_cell_right_reserve,
                     persistent_layout: None,
@@ -217,6 +219,7 @@ impl ChatWidget {
                 /*flex*/ 1,
                 RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                     child: cell,
+                    render_mode: self.history_render_mode(),
                     top: 1,
                     right: active_cell_right_reserve,
                     persistent_layout: None,
@@ -361,6 +364,7 @@ impl ChatWidget {
 
 struct TranscriptAreaRenderable<'a> {
     child: &'a dyn HistoryCell,
+    render_mode: HistoryRenderMode,
     top: u16,
     right: u16,
     persistent_layout: Option<PersistentActiveCellLayout<'a>>,
@@ -376,7 +380,9 @@ struct PersistentActiveCellLayout<'a> {
 impl Renderable for TranscriptAreaRenderable<'_> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let area = self.child_area(area);
-        let lines = self.child.display_hyperlink_lines(area.width);
+        let lines = self
+            .child
+            .display_hyperlink_lines_for_mode(area.width, self.render_mode);
         let paragraph = HyperlinkParagraph::new(&lines, Style::default());
         let y = if area.height == 0 {
             0
@@ -406,19 +412,27 @@ impl Renderable for TranscriptAreaRenderable<'_> {
             if let Some(height) = layout.desired_height {
                 height
             } else {
-                let height = HistoryCell::desired_height(self.child, child_width);
+                let height = self.child_height(child_width);
                 layout.desired_height = Some(height);
                 cache.set(Some(layout));
                 height
             }
         } else {
-            HistoryCell::desired_height(self.child, child_width)
+            self.child_height(child_width)
         };
         desired_height + self.top
     }
 }
 
 impl TranscriptAreaRenderable<'_> {
+    fn child_height(&self, width: u16) -> u16 {
+        if self.render_mode == HistoryRenderMode::Intent {
+            self.child.desired_height_for_mode(width, self.render_mode)
+        } else {
+            HistoryCell::desired_height(self.child, width)
+        }
+    }
+
     fn layout(
         &self,
         width: u16,

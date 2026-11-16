@@ -155,10 +155,14 @@ pub(crate) use warnings::warning_entries;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod intent_tests;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum HistoryRenderMode {
     Rich,
     Raw,
+    Intent,
 }
 
 pub(crate) fn raw_lines_from_source(source: &str) -> Vec<Line<'static>> {
@@ -284,6 +288,18 @@ pub(crate) trait HistoryCell: std::fmt::Debug + Send + Sync + Any {
         match mode {
             HistoryRenderMode::Rich => visible_lines(self.display_hyperlink_lines(width)),
             HistoryRenderMode::Raw => self.live_raw_lines(),
+            HistoryRenderMode::Intent => visible_lines(self.intent_hyperlink_lines(width)),
+        }
+    }
+
+    /// Presentation only: never change retained source, approval payloads, or model results.
+    fn intent_hyperlink_lines(&self, width: u16) -> Vec<HyperlinkLine> {
+        if self.activity_ids().iter().any(|id| {
+            id.starts_with("exec:") || id.starts_with("mcp:") || id.starts_with("dynamic:")
+        }) {
+            plain_hyperlink_lines(vec![Line::from("工具活动 · 展开查看详情")])
+        } else {
+            self.display_hyperlink_lines(width)
         }
     }
 
@@ -295,6 +311,7 @@ pub(crate) trait HistoryCell: std::fmt::Debug + Send + Sync + Any {
         match mode {
             HistoryRenderMode::Rich => self.display_hyperlink_lines(width),
             HistoryRenderMode::Raw => plain_hyperlink_lines(self.live_raw_lines()),
+            HistoryRenderMode::Intent => self.intent_hyperlink_lines(width),
         }
     }
 
