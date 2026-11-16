@@ -1,6 +1,6 @@
-# codex-intent 使用说明（第一阶段草稿）
+# codex-intent 使用说明
 
-当前构建及验收状态见 [STATUS.md](STATUS.md)。本文描述已加入源码、仍待运行验证的入口；不能据此认为已有正式安装包。
+第一阶段便携包已经验证并交付，路径和验证范围见 [STATUS.md](STATUS.md)。运行交付目录中的 `codex-intent.cmd`；不要将内部 `package/bin` 加入 PATH，该目录包含辅助服务需要的 `codex.exe` 别名。第二阶段面板仍在开发中。
 
 ## 显示模式
 
@@ -28,7 +28,7 @@ intent_view = true
 
 项目级 `.codex/config.toml`、项目指令和机器管理策略仍按上游规则读取；这是配置来源兼容，不是共享会话数据库。官方版不认识 `tui.intent_view`，请把该字段保存在定制版用户目录，不放入两版共同使用的项目配置或官方用户配置。
 
-验证脚本为每次运行创建单独的临时 `CODEX_HOME`，不访问正式登录或会话。版本命令应输出 `codex-intent 0.169.0+intent.1`；候选构建会检查这一点。
+验证脚本为每次运行创建单独的临时 `CODEX_HOME`，不访问正式登录或会话。第一阶段交付包输出 `codex-intent 0.169.0+intent.1`；当前第二阶段源码的候选版本为 `0.169.0+intent.2`，尚在验收。
 
 ## 构建入口
 
@@ -42,5 +42,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\intent\Build-Intent.ps1
 ```
 
 默认构建使用上游 `dev-small` profile；测试和构建都支持 `-Profile release`。报告和候选产物位于 `.intent-work`。候选包不是已发布版本，仍需终端交互验收。
+
+真实终端验收使用 Windows x64 / Python 3.13，以及固定版本与 SHA256 的 ConPTY 测试依赖：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\intent\Prepare-Validation.ps1
+python .\intent\smoke_package.py <候选包的package目录>
+python .\intent\validate_terminal.py <候选包的package目录> --stage 2
+```
+
+终端检查启动真实 CLI 和本机模拟模型，每次单独创建配置与会话。报告记录候选文件哈希和每个场景的原始日志；任何失败都会返回非零，不能作为升级发布依据。
 
 不要只复制 `codex-intent.exe`：程序依赖完整包内的执行服务、代码宿主、Windows 沙箱辅助程序及资源。后续安装和维护工具须保持这个目录结构，并协调后台服务与数据版本。目前升级、切换及回滚工具尚未交付。

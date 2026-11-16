@@ -317,17 +317,34 @@ pub(crate) fn sub_agent_activity_display(
 
 pub(crate) fn sub_agent_activity_history_cell(
     item: &ThreadItemPayload,
-) -> Option<PlainHistoryCell> {
+) -> Option<SubAgentActivityHistoryCell> {
     let ThreadItemPayload::SubAgentActivity {
         kind, agent_path, ..
     } = item
     else {
         return None;
     };
-    Some(collab_event(
+    Some(SubAgentActivityHistoryCell(collab_event(
         sub_agent_activity_title(*kind, agent_path),
         Vec::new(),
-    ))
+    )))
+}
+
+/// Lifecycle records remain available in explicit transcripts. The persistent panel owns the
+/// normal display, avoiding repeated Started/Interacted/Completed rows in conversation history.
+#[derive(Debug)]
+pub(crate) struct SubAgentActivityHistoryCell(PlainHistoryCell);
+
+impl crate::history_cell::HistoryCell for SubAgentActivityHistoryCell {
+    fn display_lines(&self, _width: u16) -> Vec<Line<'static>> {
+        Vec::new()
+    }
+    fn transcript_lines(&self, width: u16) -> Vec<Line<'static>> {
+        self.0.display_lines(width)
+    }
+    fn raw_lines(&self) -> Vec<Line<'static>> {
+        self.0.raw_lines()
+    }
 }
 
 fn sub_agent_activity_title(kind: SubAgentActivityKind, agent_path: &str) -> Line<'static> {
@@ -692,6 +709,7 @@ mod tests {
     #[test]
     fn interacted_sub_agent_activity_does_not_change_liveness() {
         let item = ThreadItemPayload::SubAgentActivity {
+            task_description: None,
             model: None,
             reasoning_effort: None,
             id: "activity-1".to_string(),
@@ -707,6 +725,7 @@ mod tests {
     fn completed_sub_agent_activity_stops_running_liveness() {
         let thread_id = ThreadId::new();
         let item = ThreadItemPayload::SubAgentActivity {
+            task_description: None,
             model: None,
             reasoning_effort: None,
             id: "activity-1".to_string(),

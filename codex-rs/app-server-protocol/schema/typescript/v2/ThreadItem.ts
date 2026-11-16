@@ -136,6 +136,10 @@ reasoningEffort: ReasoningEffort | null,
  */
 agentsStates: { [key in string]?: CollabAgentState }, } | { "type": "subAgentActivity",
 /**
+ * Display-only plaintext dispatch instructions, when available.
+ */
+taskDescription?: string,
+/**
  * Resolved model at sub-agent creation; absent from older records and other activities.
  */
 model: string | null,

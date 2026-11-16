@@ -285,6 +285,7 @@ pub(super) fn completed_item(
         )),
         EventMsg::SubAgentActivity(event) => Some((
             TurnItem::SubAgentActivity(SubAgentActivityItem {
+                task_description: event.task_description.clone(),
                 model: event.model.clone(),
                 reasoning_effort: event.reasoning_effort.clone(),
                 id: event.event_id.clone(),

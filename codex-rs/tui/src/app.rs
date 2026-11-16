@@ -210,6 +210,9 @@ pub(crate) mod agents_overview_discovery;
 mod agents_overview_threads;
 mod agents_overview_usage;
 mod agents_overview_view;
+pub(crate) mod intent_task_panel;
+#[cfg(test)]
+mod intent_task_panel_tests;
 pub(crate) use agents_overview::AGENTS_OVERVIEW_VIEW_ID;
 mod activity_groups;
 mod app_server_event_targets;
@@ -661,6 +664,7 @@ pub(crate) struct App {
     pending_thread_titles: HashMap<(ThreadId, ThreadTitleDestination), CancellationToken>,
     thread_event_listener_tasks: HashMap<ThreadId, JoinHandle<()>>,
     agent_navigation: AgentNavigationState,
+    intent_task_panel: intent_task_panel::IntentTaskPanelState,
     agents_overview: agents_overview::AgentsOverviewState,
     side_threads: HashMap<ThreadId, SideThreadState>,
     saved_openings: sidebar_loading::Openings,
@@ -928,6 +932,10 @@ impl App {
             self.chat_widget.acknowledge_program_status();
         }
         let idle_draw = matches!(event, TuiEvent::Draw);
+        if idle_draw {
+            self.refresh_intent_task_panel(app_server);
+            self.paint_intent_task_panel(tui);
+        }
         if let TuiEvent::Key(key) = &event {
             self.backtrack.observe_pending_select_exit_key(*key);
         }

@@ -15,6 +15,7 @@ enum FinalizedEvent {
 
 fn complete_subagent(chat: &mut ChatWidget, id: &str) {
     let item = AppServerThreadItemPayload::SubAgentActivity {
+        task_description: None,
         model: None,
         reasoning_effort: None,
         id: id.to_string(),
@@ -67,7 +68,15 @@ fn drain_finalized_transcript(
                 if !cell.as_any().is::<history_cell::AgentMessageCell>()
                     && !cell.as_any().is::<history_cell::FinalMessageSeparator>() =>
             {
-                let text = lines_to_single_string(&cell.display_lines(/*width*/ 80));
+                // The lifecycle record belongs to the explicit full transcript; the main
+                // conversation now shows the persistent task panel instead.
+                assert!(
+                    !cell
+                        .display_lines(80)
+                        .iter()
+                        .any(|line| line.to_string().contains("/root/"))
+                );
+                let text = lines_to_single_string(&cell.transcript_lines(/*width*/ 80));
                 rendered.push(text.clone());
                 events.push(FinalizedEvent::History(text));
             }

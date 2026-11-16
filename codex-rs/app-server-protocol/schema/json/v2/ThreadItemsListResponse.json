@@ -1514,6 +1514,13 @@
               ],
               "description": "Resolved reasoning effort at sub-agent creation, when known."
             },
+            "taskDescription": {
+              "description": "Display-only plaintext dispatch instructions, when available.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "type": {
               "enum": [
                 "subAgentActivity"

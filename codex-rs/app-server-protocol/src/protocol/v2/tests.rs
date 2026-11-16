@@ -3562,6 +3562,7 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
     );
 
     let sub_agent_activity_item = TurnItem::SubAgentActivity(SubAgentActivityItem {
+        task_description: Some("Inspect the configuration parser".into()),
         model: Some("gpt-5".into()),
         reasoning_effort: Some(ReasoningEffort::High),
         id: "activity-1".to_string(),
@@ -3575,6 +3576,7 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
     assert_eq!(
         ThreadItemPayload::from(sub_agent_activity_item),
         ThreadItemPayload::SubAgentActivity {
+            task_description: Some("Inspect the configuration parser".into()),
             model: Some("gpt-5".into()),
             reasoning_effort: Some(ReasoningEffort::High),
             id: "activity-1".to_string(),

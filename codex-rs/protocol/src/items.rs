@@ -397,6 +397,10 @@ pub struct CollabAgentToolCallItem {
 
 #[derive(Debug, Clone, Deserialize, Serialize, TS, JsonSchema, PartialEq, Eq)]
 pub struct SubAgentActivityItem {
+    /// Display-only plaintext dispatch instructions. Encrypted messages and old records omit this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub task_description: Option<String>,
     /// Resolved model at sub-agent creation; absent from older records and other activities.
     pub model: Option<String>,
     /// Resolved reasoning effort at sub-agent creation, when known.

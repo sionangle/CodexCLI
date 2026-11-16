@@ -1466,6 +1466,7 @@ async fn live_app_server_command_output_delta_transcript_snapshot() {
 async fn live_app_server_sub_agent_activity_renders_once() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
     let activity = AppServerThreadItemPayload::SubAgentActivity {
+        task_description: None,
         model: None,
         reasoning_effort: None,
         id: "activity-1".to_string(),
@@ -1494,7 +1495,10 @@ async fn live_app_server_sub_agent_activity_renders_once() {
         /*replay_kind*/ None,
     );
 
-    let cells = drain_insert_history(&mut rx);
+    let cells = drain_insert_history_with(&mut rx, |cell| {
+        assert!(cell.display_lines(80).is_empty());
+        cell.transcript_lines(80)
+    });
     assert_eq!(cells.len(), 1);
     let rendered = lines_to_single_string(&cells[0]);
     assert_chatwidget_snapshot!("app_server_sub_agent_activity_renders_once", rendered);

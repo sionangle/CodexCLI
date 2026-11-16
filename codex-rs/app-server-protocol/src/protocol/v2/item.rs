@@ -502,6 +502,10 @@ pub enum ThreadItemPayload {
     #[serde(rename_all = "camelCase")]
     #[ts(rename_all = "camelCase")]
     SubAgentActivity {
+        /// Display-only plaintext dispatch instructions, when available.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        task_description: Option<String>,
         /// Resolved model at sub-agent creation; absent from older records and other activities.
         model: Option<String>,
         /// Resolved reasoning effort at sub-agent creation, when known.
@@ -1090,6 +1094,7 @@ impl From<CoreTurnItem> for ThreadItemPayload {
                     .collect(),
             },
             CoreTurnItem::SubAgentActivity(activity) => Self::SubAgentActivity {
+                task_description: activity.task_description,
                 model: activity.model,
                 reasoning_effort: activity.reasoning_effort,
                 id: activity.id,

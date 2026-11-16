@@ -3369,6 +3369,11 @@ impl App {
             AppEvent::OpenAgentPicker => {
                 self.open_agent_picker(app_server).await;
             }
+            AppEvent::IntentTasksLoaded { root, request_id, snapshots } => {
+                self.apply_intent_task_snapshots(root, request_id, snapshots);
+                self.paint_intent_task_panel(tui);
+                tui.frame_requester().schedule_frame();
+            }
             AppEvent::AgentPickerThreadsLoaded {
                 primary_thread_id,
                 request_id,

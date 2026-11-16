@@ -23,7 +23,7 @@ $env:NO_COLOR = '1'
 $env:TERM = 'dumb'
 $cargo = Join-Path $env:CARGO_HOME 'bin\cargo.exe'
 $log = Join-Path $run 'commands.log'
-$report = [ordered]@{ status = 'running'; scope = 'stage-1-automated'; profile = $Profile; started_at = [DateTime]::UtcNow.ToString('o'); checks = @(); error = $null }
+$report = [ordered]@{ status = 'running'; scope = 'stage-2-automated'; profile = $Profile; started_at = [DateTime]::UtcNow.ToString('o'); checks = @(); error = $null }
 $gitArguments = @('-c', ('safe.directory=' + $repo.Replace('\', '/')))
 $report['terminal_profile'] = 'FORCE_COLOR=0; NO_COLOR=1; TERM=dumb'
 $report['tui_snapshot_version'] = '0.0.0; actual binaries are checked separately'
@@ -97,6 +97,10 @@ try {
     $report.checks += [ordered]@{ name = 'upstream dependency lock'; exit_code = 0 }
     Invoke-Check 'format' @('fmt', '--all', '--', '--check')
     Invoke-Check 'intent rendering regression tests' @('test', '--locked', '-p', 'codex-tui', '--lib', 'intent_') 12
+    Invoke-Check 'V2 task state aggregation' @('test', '--locked', '-p', 'codex-tui', '--lib', 'intent_tasks::tests::') 11
+    Invoke-Check 'V2 persistent panel integration' @('test', '--locked', '-p', 'codex-tui', '--lib', 'intent_task_panel_tests::') 1
+    Invoke-Check 'V2 encrypted description boundary' @('test', '--locked', '-p', 'codex-core', '--lib', 'intent_task_description_never_exposes_encrypted_messages') 1
+    Invoke-Check 'V2 protocol and schema contracts' @('test', '--locked', '-p', 'codex-app-server-protocol', '--lib') 323
     Invoke-Check 'V2 activity preview' @('test', '--locked', '-p', 'codex-tui', '--lib', 'agent_status_') 3
     Invoke-Check 'configuration persistence' @('test', '--locked', '-p', 'codex-tui', '--lib', 'config_panel')
     Invoke-Check 'configuration types' @('test', '--locked', '-p', 'codex-config', '--lib')

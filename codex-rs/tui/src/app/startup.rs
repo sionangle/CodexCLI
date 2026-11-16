@@ -1067,6 +1067,7 @@ See the Codex keymap documentation for supported actions and examples."
             pending_thread_titles: HashMap::new(),
             thread_event_listener_tasks: HashMap::new(),
             agent_navigation: AgentNavigationState::default(),
+            intent_task_panel: Default::default(),
             agents_overview,
             side_threads: HashMap::new(),
             saved_openings: Default::default(),

@@ -4798,6 +4798,9 @@ pub enum SubAgentActivityKind {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, JsonSchema, TS)]
 pub struct SubAgentActivityEvent {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub task_description: Option<String>,
     /// Resolved model at sub-agent creation; absent from older records and other activities.
     pub model: Option<String>,
     /// Resolved reasoning effort at sub-agent creation, when known.

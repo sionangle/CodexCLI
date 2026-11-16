@@ -54,6 +54,10 @@ pub(super) async fn handle_message_string_tool(
         source,
         ..
     } = invocation;
+    let message = agent_message_from_tool(message, &source);
+    let task_description = (mode == MessageDeliveryMode::TriggerTurn)
+        .then(|| task_description(&message))
+        .flatten();
     let receiver_thread_id = resolve_agent_target(&session, &turn, &target).await?;
     analytics.set_receiver(receiver_thread_id);
     let resume_config =
@@ -65,10 +69,7 @@ pub(super) async fn handle_message_string_tool(
             caller: session.thread_id,
             target: AgentTarget::Id(receiver_thread_id),
             resume_config,
-            input: AgentInput::Message {
-                message: agent_message_from_tool(message, &source),
-                mode,
-            },
+            input: AgentInput::Message { message, mode },
             start_options: TurnStartOptions {
                 parent_turn_id: (mode == MessageDeliveryMode::TriggerTurn)
                     .then(|| turn.sub_id.clone()),
@@ -87,6 +88,7 @@ pub(super) async fn handle_message_string_tool(
         &session,
         &turn,
         SubAgentActivityItem {
+            task_description,
             model: None,
             reasoning_effort: None,
             id: call_id,

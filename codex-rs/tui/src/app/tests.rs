@@ -2679,6 +2679,7 @@ async fn open_agent_picker_selects_path_backed_agent() -> Result<()> {
             main.to_string(),
             "turn-1".to_string(),
             ThreadItemPayload::SubAgentActivity {
+                task_description: None,
                 id: "activity".to_string(),
                 kind: codex_app_server_protocol::SubAgentActivityKind::Started,
                 agent_thread_id: waiting.to_string(),
@@ -9011,6 +9012,7 @@ async fn make_test_app() -> Box<App> {
         pending_thread_titles: HashMap::new(),
         thread_event_listener_tasks: HashMap::new(),
         agent_navigation: AgentNavigationState::default(),
+        intent_task_panel: Default::default(),
         pending_server_profiles: HashMap::new(),
         agents_overview: Default::default(),
         side_threads: HashMap::new(),
@@ -9151,6 +9153,7 @@ pub(super) async fn make_test_app_with_channels() -> (
             pending_thread_titles: HashMap::new(),
             thread_event_listener_tasks: HashMap::new(),
             agent_navigation: AgentNavigationState::default(),
+            intent_task_panel: Default::default(),
             pending_server_profiles: HashMap::new(),
             agents_overview: Default::default(),
             side_threads: HashMap::new(),

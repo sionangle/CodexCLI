@@ -1093,6 +1093,19 @@ impl App {
             return Ok(());
         }
         self.track_side_chat_title(thread_id, &notification);
+        if self.primary_thread_id == Some(thread_id)
+            || self
+                .intent_task_panel
+                .tasks
+                .tasks
+                .contains_key(&thread_id.to_string())
+        {
+            self.intent_task_panel.tasks.notification(
+                &thread_id.to_string(),
+                &notification,
+                crate::intent_tasks::now_ms(),
+            );
+        }
         if self.current_displayed_thread_id() == Some(thread_id)
             && let ServerNotification::TurnCompleted(notification) = &notification
         {

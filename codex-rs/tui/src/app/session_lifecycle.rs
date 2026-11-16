@@ -93,7 +93,7 @@ impl App {
         let path_backed_threads = self
             .agent_navigation
             .ordered_path_backed_subagent_threads(self.primary_thread_id);
-        if !path_backed_threads.is_empty() {
+        if !path_backed_threads.is_empty() && self.intent_task_panel.tasks.tasks.is_empty() {
             let running_threads: Vec<_> = path_backed_threads
                 .into_iter()
                 .filter_map(|(thread_id, entry)| {
@@ -200,7 +200,21 @@ impl App {
                 {
                     initial_selected_idx = Some(idx);
                 }
-                let name = self.thread_label(thread_id);
+                let task = self
+                    .intent_task_panel
+                    .tasks
+                    .tasks
+                    .get(&thread_id.to_string());
+                let name = task
+                    .map(|task| {
+                        format!(
+                            "{} · {} · {}",
+                            task.title,
+                            task.status.label(),
+                            task.elapsed(crate::intent_tasks::now_ms())
+                        )
+                    })
+                    .unwrap_or_else(|| self.thread_label(thread_id));
                 let uuid = thread_id.to_string();
                 SelectionItem {
                     name: if is_pending {
@@ -209,7 +223,15 @@ impl App {
                         name.clone()
                     },
                     name_prefix_spans: agent_picker_status_dot_spans(entry.is_closed),
-                    description: Some(uuid.clone()),
+                    description: Some(
+                        task.map(|task| {
+                            let mut lines = task.lines(crate::intent_tasks::now_ms());
+                            lines.remove(0);
+                            lines.push(format!("详情路径：{} · Enter 打开子任务", task.path));
+                            lines.join("\n")
+                        })
+                        .unwrap_or_else(|| uuid.clone()),
+                    ),
                     is_current,
                     actions: vec![Box::new(move |tx| {
                         tx.send(AppEvent::SelectAgentThread(thread_id));

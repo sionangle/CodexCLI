@@ -65,3 +65,28 @@ fn agent_message_from_tool(
         AgentMessage::Encrypted(message)
     }
 }
+
+/// Never treat encrypted model content as a human-readable task description.
+fn task_description(message: &AgentMessage) -> Option<String> {
+    match message {
+        AgentMessage::Plaintext(text) => Some(text.clone()),
+        AgentMessage::Encrypted(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod intent_tests {
+    use super::*;
+
+    #[test]
+    fn intent_task_description_never_exposes_encrypted_messages() {
+        assert_eq!(
+            task_description(&AgentMessage::Encrypted("opaque-ciphertext".into())),
+            None
+        );
+        assert_eq!(
+            task_description(&AgentMessage::Plaintext("Check the parser".into())),
+            Some("Check the parser".into())
+        );
+    }
+}

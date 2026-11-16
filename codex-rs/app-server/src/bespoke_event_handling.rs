@@ -3341,6 +3341,7 @@ mod tests {
                     thread_id: conversation_id,
                     turn_id: "turn-1".to_string(),
                     item: CoreTurnItem::SubAgentActivity(SubAgentActivityItem {
+                        task_description: None,
                         model: None,
                         reasoning_effort: None,
                         id: "activity-1".to_string(),
@@ -3379,6 +3380,7 @@ mod tests {
                 conversation_id.to_string(),
                 "turn-1".to_string(),
                 ThreadItemPayload::SubAgentActivity {
+                    task_description: None,
                     model: None,
                     reasoning_effort: None,
                     id: "activity-1".to_string(),

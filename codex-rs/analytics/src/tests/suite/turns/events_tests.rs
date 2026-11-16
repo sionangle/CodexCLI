@@ -538,6 +538,7 @@ async fn turn_event_counts_completed_tool_items() {
             agents_states: Default::default(),
         },
         ThreadItemPayload::SubAgentActivity {
+            task_description: None,
             model: None,
             reasoning_effort: None,
             id: "sub-agent-activity-1".to_string(),
@@ -546,6 +547,7 @@ async fn turn_event_counts_completed_tool_items() {
             agent_path: "/root/child".to_string(),
         },
         ThreadItemPayload::SubAgentActivity {
+            task_description: None,
             model: None,
             reasoning_effort: None,
             id: "sub-agent-activity-completed".to_string(),

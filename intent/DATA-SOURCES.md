@@ -26,3 +26,15 @@
 `session/mod.rs::record_inter_agent_communication` 将 `InterAgentCommunicationMetadata { trigger_turn }` 和 `ResponseItem::AgentMessage` 持久化，再发出原始响应条目事件。后者具有 author/recipient，内容可能为 `InputText`，也可能含 `EncryptedContent`。`event_mapping.rs::parse_turn_item` 不把这种 `ResponseItem::AgentMessage` 映射成常规可见 `TurnItem::AgentMessage`。因此仅依靠现有可见 turn items 或 thread.preview 无法保证取得任务正文。
 
 第二阶段需要在原始事件/历史聚合入口核实订阅和恢复读取方式；有明文且归属明确时使用真实任务正文。加密正文无法从 TUI 自行恢复，必须明确显示缺失描述，不能从父线程的首条用户消息或内部路径推测职责。此处仅记录来源，尚未加入新的聚合或面板实现。
+
+## 第二阶段采用的接入方式（正在验收）
+
+保持现有线程存储、模型输入和工具返回值不变，在 `SubAgentActivityItem`、兼容事件与 app-server payload 中增加可选 `task_description`。仅在 spawn 和 TriggerTurn 派发明文时填写，QueueOnly 和加密消息不填写。字段由既有 item 事件和 rollout 保存流程承载，旧记录可继续反序列化，不引入数据库迁移。
+
+TUI 复用根会话的 V2 后代发现和通知路由，按真实 turn ID 聚合。创建顺序由已声明为 UUIDv7 的线程/turn ID 及记录的开始时间确定：继承的父 turn 不能作为新子线程的任务状态。重复生命周期事件不启动计时；同一 turn 的终态不被旧 Running 通知覆盖。新派发的说明先作为待处理说明，真实新 turn 出现后才替换本次任务。
+
+补充读取通过现有 `thread/read`、`thread/turns/list` 和 `thread/items/list` 在后台完成。每次读取最多四页、每页 100 条；并发读取限制为 8，每 3 秒补充状态。原始工具输出不进入面板聚合。根和已发现后代首次读取时回填任务说明，排除继承历史中不属于本子树的派发；超过窗口的旧说明可能无法回填，明确显示“任务说明未记录或不可读”。原始详情仍可通过线程历史打开。
+
+实时收到消息使用实际接收时刻；历史回填标示“历史进度记录于”，不会使用恢复时刻冒充进度时刻。没有可靠开始/结束或 duration 的历史显示“时间未记录”；没有助手文本显示“尚未收到进度”。终态耗时固定。小终端显示部分任务和剩余数量，`/subagents` 列出全部条目及详情入口。
+
+当前定向测试已经覆盖重放、重复、重新派发、等待、终态、嵌套和继承边界；真实 V2 并行执行及恢复验收仍待完成。上述限制须随最终交付说明一并保留。

@@ -179,6 +179,7 @@ impl App {
         self.agent_navigation.prune_untracked_picker_exclusions();
 
         self.refresh_agent_picker();
+        self.chat_widget.request_redraw();
         if completion.follow_up_requested {
             self.refresh_agent_picker_threads(app_server, root);
         }

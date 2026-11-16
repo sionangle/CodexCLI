@@ -125,6 +125,7 @@ pub(crate) async fn make_test_app() -> Box<App> {
         pending_thread_titles: HashMap::new(),
         thread_event_listener_tasks: HashMap::new(),
         agent_navigation: AgentNavigationState::default(),
+        intent_task_panel: Default::default(),
         agents_overview: Default::default(),
         side_threads: HashMap::new(),
         saved_openings: Default::default(),

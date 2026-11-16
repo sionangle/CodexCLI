@@ -7,6 +7,26 @@ use crate::history_cell::PlainHistoryCell;
 use crate::pager_overlay::TranscriptHistoryState;
 use pretty_assertions::assert_eq;
 
+// History paging and descendant discovery can complete on the same event channel. Exercise
+// the real event dispatch while waiting for this test's page, rather than assuming it is next.
+async fn next_history_event(
+    app: &mut App,
+    tui: &mut tui::Tui,
+    server: &mut AppServerSession,
+    events: &mut tokio::sync::mpsc::UnboundedReceiver<AppEvent>,
+) -> Result<AppEvent> {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let event = events.recv().await.expect("history completion channel");
+            if matches!(&event, AppEvent::OlderThreadHistoryLoaded { .. }) {
+                return Ok(event);
+            }
+            Box::pin(app.handle_event(tui, server, event)).await?;
+        }
+    })
+    .await?
+}
+
 #[tokio::test]
 async fn browsing_loads_before_the_oldest_prompt_after_a_partial_answer() -> Result<()> {
     for cancel_before_completion in [false, true] {
@@ -74,9 +94,8 @@ async fn browsing_loads_before_the_oldest_prompt_after_a_partial_answer() -> Res
             app.transcript_view.history,
             TranscriptHistoryState::LoadingOlder
         );
-        let first_event = tokio::time::timeout(Duration::from_secs(/*secs*/ 5), event_rx.recv())
-            .await?
-            .expect("older history completion");
+        let first_event =
+            next_history_event(&mut app, &mut tui, &mut app_server, &mut event_rx).await?;
         let AppEvent::OlderThreadHistoryLoaded { cursor, .. } = first_event else {
             panic!("expected an older history completion")
         };
@@ -86,7 +105,10 @@ async fn browsing_loads_before_the_oldest_prompt_after_a_partial_answer() -> Res
                 .await?;
         }
         assert!(app_server.is_older_history_page_pending(thread_id, &cursor));
-        assert!(event_rx.try_recv().is_err());
+        while let Ok(event) = event_rx.try_recv() {
+            assert!(!matches!(&event, AppEvent::OlderThreadHistoryLoaded { .. }));
+            Box::pin(app.handle_event(&mut tui, &mut app_server, event)).await?;
+        }
         // Complete only an answer item first: browsing must continue to a page with a prompt.
         let first_page = app_server
             .thread_items_page(
@@ -127,9 +149,7 @@ async fn browsing_loads_before_the_oldest_prompt_after_a_partial_answer() -> Res
             );
         } else {
             let final_event =
-                tokio::time::timeout(Duration::from_secs(/*secs*/ 5), event_rx.recv())
-                    .await?
-                    .expect("older prompt completion");
+                next_history_event(&mut app, &mut tui, &mut app_server, &mut event_rx).await?;
             Box::pin(app.handle_event(&mut tui, &mut app_server, final_event)).await?;
             assert_eq!(
                 (app.backtrack.nth_user_message, app.transcript_view.history),
