@@ -197,7 +197,7 @@ impl ChatWidget {
             running_commands: HashMap::new(),
             collab_agent_metadata: HashMap::new(),
             pending_collab_spawn_requests: HashMap::new(),
-            intent_task_panel_lines: Vec::new(),
+            intent_task_rows: Default::default(),
             suppressed_exec_calls: HashSet::new(),
             last_unified_wait: None,
             unified_exec_wait_streak: None,

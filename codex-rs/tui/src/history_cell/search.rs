@@ -125,13 +125,17 @@ impl WebSearchCell {
 }
 
 impl HistoryCell for WebSearchCell {
+    fn intent_details_available(&self) -> bool {
+        true
+    }
+
     fn intent_hyperlink_lines(&self, _width: u16) -> Vec<HyperlinkLine> {
         let text = if self.completed {
             "网页查找已完成"
         } else {
             "正在查找网页资料"
         };
-        plain_hyperlink_lines(vec![Line::from(text)])
+        plain_hyperlink_lines(vec![intent_hint_line(text)])
     }
 
     fn tool_call_labels(&self) -> Vec<String> {

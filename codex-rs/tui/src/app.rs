@@ -210,6 +210,7 @@ pub(crate) mod agents_overview_discovery;
 mod agents_overview_threads;
 mod agents_overview_usage;
 mod agents_overview_view;
+mod intent_details;
 pub(crate) mod intent_task_panel;
 #[cfg(test)]
 mod intent_task_panel_tests;
@@ -935,6 +936,7 @@ impl App {
         if idle_draw {
             self.refresh_intent_task_panel(app_server);
             self.paint_intent_task_panel(tui);
+            self.refresh_intent_details(tui);
         }
         if let TuiEvent::Key(key) = &event {
             self.backtrack.observe_pending_select_exit_key(*key);
@@ -953,7 +955,8 @@ impl App {
             }
             self.backtrack.select_exit_key = None;
         }
-        if self.continue_passive_link_drag(tui, &event)?
+        if self.handle_intent_detail_event(tui, &event)?
+            || self.continue_passive_link_drag(tui, &event)?
             || self.handle_divider_event(tui, &event).await?
             || self.handle_rendered_selection_event(tui, &event)?
         {

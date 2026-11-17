@@ -42,15 +42,19 @@ pub(crate) struct LabeledToolCell {
 }
 
 impl HistoryCell for LabeledToolCell {
+    fn intent_details_available(&self) -> bool {
+        true
+    }
+
     fn intent_hyperlink_lines(&self, _width: u16) -> Vec<HyperlinkLine> {
         let text = if self.label.starts_with("Declined") {
-            "工具执行未获批准 · 请检查审批选项，完整记录中可查看详情"
+            "工具执行未获批准 · 请检查审批选项"
         } else if self.label.starts_with("Failed") {
-            "工具操作失败 · 完整记录中可查看原因"
+            "工具操作失败"
         } else {
-            "工具活动 · 完整记录中可查看详情"
+            "工具活动"
         };
-        plain_hyperlink_lines(vec![Line::from(text)])
+        plain_hyperlink_lines(vec![intent_hint_line(text)])
     }
 
     fn tool_call_labels(&self) -> Vec<String> {
@@ -159,6 +163,12 @@ impl CompositeHistoryCell {
 }
 
 impl HistoryCell for CompositeHistoryCell {
+    fn intent_details_available(&self) -> bool {
+        self.parts
+            .iter()
+            .any(|part| part.intent_details_available())
+    }
+
     fn intent_hyperlink_lines(&self, width: u16) -> Vec<HyperlinkLine> {
         let mut out = Vec::new();
         for part in &self.parts {

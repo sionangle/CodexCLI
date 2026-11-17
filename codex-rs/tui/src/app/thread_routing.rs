@@ -1094,6 +1094,13 @@ impl App {
         }
         self.track_side_chat_title(thread_id, &notification);
         if self.primary_thread_id == Some(thread_id)
+            && let ServerNotification::TurnCompleted(n) = &notification
+        {
+            self.intent_task_panel
+                .tasks
+                .parent_turn(&n.turn, Some(crate::intent_tasks::now_ms()));
+        }
+        if self.primary_thread_id == Some(thread_id)
             || self
                 .intent_task_panel
                 .tasks

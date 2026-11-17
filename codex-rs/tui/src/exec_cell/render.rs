@@ -350,14 +350,11 @@ impl HistoryCell for ExecCell {
             } else if let Some(output) = &call.output
                 && output.exit_code != 0
             {
-                format!(
-                    "命令未成功完成（退出码 {}）· 展开详情查看原因",
-                    output.exit_code
-                )
+                format!("命令未成功完成（退出码 {}）", output.exit_code)
             } else {
                 "工具任务已完成".to_owned()
             };
-            lines.push(Line::from(line));
+            lines.push(crate::history_cell::intent_hint_line(line));
         }
         plain_hyperlink_lines(lines)
     }

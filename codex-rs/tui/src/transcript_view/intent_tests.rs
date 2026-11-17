@@ -119,3 +119,30 @@ fn intent_explicit_full_records_open_on_first_request() {
     assert!(layout.text().contains("hidden_command"));
     assert!(layout.text().contains("hidden_output"));
 }
+
+#[test]
+fn intent_detail_click_uses_wrapped_unicode_layout_and_ignores_assistant_lookalikes() {
+    let cells: Vec<Arc<dyn HistoryCell>> = vec![
+        Arc::new(source()),
+        Arc::new(crate::history_cell::PlainHistoryCell::new(vec![
+            Line::from("[查看详情]"),
+        ])),
+    ];
+    for width in [12, 24, 80] {
+        let mut view = TranscriptView::default();
+        view.set_presentation(false, HistoryRenderMode::Intent);
+        let area = Rect::new(3, 4, width, 20);
+        view.render(area, &mut Buffer::empty(area), &cells);
+        let hits: Vec<_> = (area.y..area.bottom())
+            .flat_map(|y| (area.x..area.right()).map(move |x| (x, y)))
+            .filter_map(|(x, y)| view.intent_details_at(x, y, &cells))
+            .collect();
+        assert!(!hits.is_empty(), "no clickable label at width {width}");
+        assert!(hits.iter().all(|index| *index == 0));
+        view.set_presentation(true, HistoryRenderMode::Intent);
+        view.render(area, &mut Buffer::empty(area), &cells);
+        assert!((area.y..area.bottom()).all(|y| {
+            (area.x..area.right()).all(|x| view.intent_details_at(x, y, &cells).is_none())
+        }));
+    }
+}

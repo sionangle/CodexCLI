@@ -106,9 +106,13 @@ pub(crate) struct PatchFailureCell {
 }
 
 impl HistoryCell for PatchFailureCell {
+    fn intent_details_available(&self) -> bool {
+        true
+    }
+
     fn intent_hyperlink_lines(&self, _width: u16) -> Vec<HyperlinkLine> {
-        plain_hyperlink_lines(vec![Line::from(
-            "代码修改未成功应用 · 展开详情检查冲突或文件权限",
+        plain_hyperlink_lines(vec![intent_hint_line(
+            "代码修改未成功应用 · 请检查冲突或文件权限",
         )])
     }
 

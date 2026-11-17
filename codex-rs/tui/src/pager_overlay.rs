@@ -87,6 +87,7 @@ impl Overlay {
     pub(crate) fn handle_event(&mut self, tui: &mut tui::Tui, event: TuiEvent) -> Result<()> {
         let mouse_capture = match self {
             Overlay::Transcript(_) | Overlay::Analytics(_) => tui::MouseCapture::Enabled,
+            Overlay::Static(o) if o.intent_details => tui::MouseCapture::Enabled,
             Overlay::Static(_) => tui::MouseCapture::Disabled,
         };
         tui.set_mouse_capture(mouse_capture)?;
@@ -418,12 +419,26 @@ pub(crate) struct PagerAction {
 }
 
 pub(crate) struct StaticOverlay {
+    pub(crate) intent_details: bool,
+    pub(crate) intent_scroll_speed: f64,
+    intent_scroll_pending: f64,
+    intent_lines: Option<Vec<Line<'static>>>,
     pub(crate) action: Option<PagerAction>,
     view: PagerView,
     is_done: bool,
 }
 
 impl StaticOverlay {
+    pub(crate) fn update_intent_lines(&mut self, lines: Vec<Line<'static>>) {
+        if self.intent_lines.as_ref() == Some(&lines) {
+            return;
+        }
+        self.view.renderables = vec![Box::new(CachedRenderable::new(
+            Paragraph::new(Text::from(lines.clone())).wrap(Wrap { trim: false }),
+        ))];
+        self.intent_lines = Some(lines);
+    }
+
     const HINTS_HEIGHT: u16 = 3;
 
     pub(crate) fn with_title(
@@ -446,6 +461,10 @@ impl StaticOverlay {
     ) -> Self {
         Self {
             view: PagerView::new(renderables, title, /*scroll_offset*/ 0, keymap),
+            intent_details: false,
+            intent_scroll_speed: 1.0,
+            intent_scroll_pending: 0.0,
+            intent_lines: None,
             is_done: false,
             action: None,
         }
@@ -478,7 +497,11 @@ impl StaticOverlay {
     pub(crate) fn handle_event(&mut self, tui: &mut tui::Tui, event: TuiEvent) -> Result<()> {
         match event {
             TuiEvent::Key(key) => {
-                if self.view.keymap.close.is_pressed(key) {
+                if self.view.keymap.close.is_pressed(key)
+                    || (self.intent_details
+                        && key.code == KeyCode::Esc
+                        && key.kind != crossterm::event::KeyEventKind::Release)
+                {
                     self.is_done = true;
                 } else if key.kind == crossterm::event::KeyEventKind::Press
                     && let Some(action) = self.action.take_if(|action| action.key.is_press(key))
@@ -488,6 +511,20 @@ impl StaticOverlay {
                 } else {
                     return self.view.handle_key_event(tui, key);
                 }
+                Ok(())
+            }
+            TuiEvent::Mouse(mouse) if self.intent_details => {
+                use crossterm::event::MouseEventKind;
+                let direction = match mouse.kind {
+                    MouseEventKind::ScrollDown => 1.0,
+                    MouseEventKind::ScrollUp => -1.0,
+                    _ => return Ok(()),
+                };
+                self.intent_scroll_pending += direction * self.intent_scroll_speed;
+                let lines = self.intent_scroll_pending.trunc() as isize;
+                self.intent_scroll_pending -= lines as f64;
+                self.view.scroll_offset = self.view.scroll_offset.saturating_add_signed(lines);
+                tui.frame_requester().schedule_frame();
                 Ok(())
             }
             TuiEvent::Draw | TuiEvent::Resume | TuiEvent::Resize(_) | TuiEvent::FocusGained => {

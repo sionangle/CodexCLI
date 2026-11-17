@@ -360,9 +360,9 @@ impl HistoryCell for McpToolCallCell {
         let text = match self.success() {
             None => "正在调用工具",
             Some(true) => "工具调用已完成",
-            Some(false) => "工具调用失败 · 展开详情查看原因",
+            Some(false) => "工具调用失败",
         };
-        plain_hyperlink_lines(vec![Line::from(text)])
+        plain_hyperlink_lines(vec![intent_hint_line(text)])
     }
 
     fn tool_call_labels(&self) -> Vec<String> {

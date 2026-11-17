@@ -294,21 +294,15 @@ impl ChatWidget {
             options.separate_status_line = options.command_popup_placement
                 != crate::bottom_pane::CommandPopupPlacement::AboveComposer;
             let bottom_pane = self.bottom_pane.backdrop_with_options(options);
-            let bottom_pane = if !self.intent_task_panel_lines.is_empty()
-                && !self.bottom_pane.has_active_view()
-            {
-                let mut column = FlexRenderable::new();
-                column.push(
-                    0,
-                    RenderableItem::Owned(Box::new(Paragraph::new(
-                        self.intent_task_panel_lines.clone(),
-                    ))),
-                );
-                column.push(0, bottom_pane);
-                RenderableItem::Owned(Box::new(column))
-            } else {
-                bottom_pane
-            };
+            let bottom_pane =
+                if !self.intent_task_rows.is_empty() && !self.bottom_pane.has_active_view() {
+                    let mut column = FlexRenderable::new();
+                    column.push(0, RenderableItem::Borrowed(&self.intent_task_rows));
+                    column.push(0, bottom_pane);
+                    RenderableItem::Owned(Box::new(column))
+                } else {
+                    bottom_pane
+                };
             let above_composer = if self.quick_dial_menu && !options.floating_shortcuts {
                 RenderableItem::Owned(Box::new(self.quick_dial_hud()))
             } else if let Some(backend) = self.visible_new_backend_control() {
@@ -370,6 +364,24 @@ impl ChatWidget {
             lines.extend(cell_lines);
         }
         (!lines.is_empty()).then_some(lines)
+    }
+
+    pub(crate) fn intent_live_details(&self) -> (Vec<String>, Vec<Line<'static>>) {
+        let mut ids = Vec::new();
+        let mut lines = Vec::new();
+        for cell in self.transcript.active_cell.as_deref().into_iter().chain(
+            self.realtime_conversation
+                .pending_history_cells
+                .iter()
+                .chain(self.realtime_conversation.live_transcript_cells())
+                .map(AsRef::as_ref),
+        ) {
+            if cell.intent_details_available() {
+                ids.extend(cell.activity_ids());
+                lines.extend(cell.live_raw_lines());
+            }
+        }
+        (ids, lines)
     }
 
     pub(crate) fn note_rendered_width(&self, width: u16) {

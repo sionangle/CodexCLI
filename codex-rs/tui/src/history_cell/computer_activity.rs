@@ -119,6 +119,10 @@ fn error_preview(call: &McpToolCallCell) -> Option<&str> {
 }
 
 impl HistoryCell for ComputerActivityCell {
+    fn intent_details_available(&self) -> bool {
+        true
+    }
+
     fn intent_hyperlink_lines(&self, width: u16) -> Vec<HyperlinkLine> {
         self.group
             .calls

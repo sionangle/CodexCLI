@@ -55,6 +55,7 @@ pub(crate) struct IntentTask {
     started_ms: Option<i64>,
     completed_ms: Option<i64>,
     duration_ms: Option<i64>,
+    finished_received_ms: Option<i64>,
     uncertain_end: bool,
     pub(crate) current: String,
     pub(crate) progress: Option<String>,
@@ -96,6 +97,7 @@ impl IntentTask {
             started_ms: None,
             completed_ms: None,
             duration_ms: None,
+            finished_received_ms: None,
             uncertain_end: false,
             current: "等待任务开始记录".to_string(),
             progress: None,
@@ -157,6 +159,7 @@ impl IntentTask {
             self.started_ms = started_ms;
             self.completed_ms = None;
             self.duration_ms = None;
+            self.finished_received_ms = None;
             self.uncertain_end = false;
             self.status = TaskStatus::Running;
             if let Some(purpose) = self.pending_purpose.take() {
@@ -204,11 +207,13 @@ impl IntentTask {
             if self.status == TaskStatus::Running {
                 self.current = self
                     .progress
-                    .clone()
+                    .as_deref()
+                    .and_then(excerpt)
                     .unwrap_or_else(|| "尚未收到进度".to_string());
             }
         }
         if self.status.terminal() {
+            self.finished_received_ms = self.finished_received_ms.or(live_at);
             // Set the end once. Duplicate completions never restart the clock.
             self.completed_ms = self
                 .completed_ms
@@ -253,7 +258,7 @@ impl IntentTask {
         {
             return;
         }
-        if same_item && self.progress.as_ref() == Some(&summary) {
+        if same_item && self.progress.as_ref() == Some(text) {
             return;
         }
         // Untimed historical items cannot displace timed or live progress from a newer source.
@@ -264,7 +269,8 @@ impl IntentTask {
         {
             return;
         }
-        self.progress = Some(summary.clone());
+        // Keep authored content for the details popup; compact surfaces use excerpts.
+        self.progress = Some(text.clone());
         if matches!(
             &item.payload,
             ThreadItemPayload::AgentMessage {
@@ -272,7 +278,7 @@ impl IntentTask {
                 ..
             }
         ) {
-            self.result = Some(summary.clone());
+            self.result = Some(text.clone());
         }
         self.progress_id = Some(item.id().to_string());
         self.progress_at = recorded_at;
@@ -350,11 +356,42 @@ impl IntentTask {
         }
         lines
     }
+
+    pub(crate) fn compact_elapsed(&self, now_ms: i64) -> String {
+        if self.uncertain_end {
+            return "--:--".to_string();
+        }
+        let duration = if self.status.terminal() {
+            self.duration_ms
+        } else {
+            self.started_ms
+                .map(|start| now_ms.saturating_sub(start).max(0))
+        };
+        duration.map_or_else(
+            || "--:--".to_string(),
+            |duration| {
+                let seconds = duration / 1_000;
+                format!("{:02}:{:02}", seconds / 60, seconds % 60)
+            },
+        )
+    }
+
+    fn finished_at(&self) -> Option<i64> {
+        self.completed_ms
+            .or_else(|| {
+                self.started_ms
+                    .zip(self.duration_ms)
+                    .map(|(a, b)| a.saturating_add(b))
+            })
+            .or(self.finished_received_ms)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct IntentTasks {
     pub(crate) tasks: BTreeMap<String, IntentTask>,
+    parent_finished_ms: Option<i64>,
+    retired: HashSet<(String, String)>,
 }
 
 impl IntentTasks {
@@ -377,7 +414,9 @@ impl IntentTasks {
         {
             self.discover(agent_thread_id, agent_path);
             if let Some(task) = self.tasks.get_mut(agent_thread_id)
-                && let Some(description) = task_description.as_deref().and_then(excerpt)
+                && let Some(description) = task_description
+                    .as_ref()
+                    .filter(|text| !text.trim().is_empty())
             {
                 let at = item.completed_at_ms.or(item.started_at_ms);
                 if task.purpose_id.as_ref() != Some(id)
@@ -391,9 +430,9 @@ impl IntentTasks {
                             .zip(at)
                             .is_none_or(|(end, dispatch)| dispatch >= end + 1_000)
                     {
-                        task.pending_purpose = Some(description);
+                        task.pending_purpose = Some(description.clone());
                     } else {
-                        task.purpose = Some(description);
+                        task.purpose = Some(description.clone());
                     }
                     task.purpose_at = at;
                     task.purpose_id = Some(id.clone());
@@ -462,6 +501,55 @@ impl IntentTasks {
         let mut rows: Vec<_> = self.tasks.values().cloned().collect();
         rows.sort_by(|a, b| a.path.cmp(&b.path));
         rows
+    }
+
+    /// Finishing the parent's reply acknowledges already finished runs. Retain the records for
+    /// details and replay; a new turn on the same child is a different visible run.
+    pub(crate) fn parent_turn(&mut self, turn: &Turn, live_at: Option<i64>) {
+        if turn.status != TurnStatus::Completed {
+            return;
+        }
+        let end = turn
+            .completed_at
+            .map(|at| at.saturating_mul(1_000))
+            .or_else(|| {
+                turn.started_at
+                    .zip(turn.duration_ms)
+                    .map(|(at, duration)| at.saturating_mul(1_000).saturating_add(duration))
+            })
+            .or(live_at);
+        if let Some(end) = end {
+            self.parent_finished_ms = Some(self.parent_finished_ms.map_or(end, |old| old.max(end)));
+        }
+        for task in self.tasks.values().filter(|task| task.status.terminal()) {
+            if task
+                .finished_at()
+                .zip(end)
+                .is_some_and(|(finished, parent)| finished <= parent)
+                && let Some(turn_id) = &task.turn_id
+            {
+                self.retired
+                    .insert((task.thread_id.clone(), turn_id.clone()));
+            }
+        }
+    }
+
+    pub(crate) fn visible_rows(&self) -> Vec<IntentTask> {
+        self.rows()
+            .into_iter()
+            .filter(|task| {
+                let retired = task.turn_id.as_ref().is_some_and(|turn| {
+                    self.retired
+                        .contains(&(task.thread_id.clone(), turn.clone()))
+                });
+                let acknowledged_history = task.status.terminal()
+                    && task
+                        .finished_at()
+                        .zip(self.parent_finished_ms)
+                        .is_some_and(|(finished, parent)| finished <= parent);
+                !retired && !acknowledged_history
+            })
+            .collect()
     }
 }
 

@@ -179,15 +179,15 @@ impl HistoryCell for DynamicToolCallCell {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let text = if data.interrupted {
-            "工具调用已中断 · 展开详情查看记录"
+            "工具调用已中断"
         } else {
             match data.status {
                 DynamicToolCallStatus::InProgress => "正在执行工具任务",
                 DynamicToolCallStatus::Completed => "工具任务已完成",
-                DynamicToolCallStatus::Failed => "工具调用失败 · 展开详情查看原因",
+                DynamicToolCallStatus::Failed => "工具调用失败",
             }
         };
-        plain_hyperlink_lines(vec![Line::from(text)])
+        plain_hyperlink_lines(vec![crate::history_cell::intent_hint_line(text)])
     }
 
     fn tool_call_labels(&self) -> Vec<String> {

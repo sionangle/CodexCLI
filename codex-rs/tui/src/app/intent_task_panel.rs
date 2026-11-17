@@ -21,6 +21,8 @@ use futures::StreamExt;
 
 #[derive(Default)]
 pub(super) struct IntentTaskPanelState {
+    pub(super) details: Option<super::intent_details::DetailPopup>,
+    pub(super) pressed: Option<(u16, u16, super::intent_details::DetailTarget)>,
     pub(super) tasks: IntentTasks,
     pub(super) root: Option<ThreadId>,
     pub(super) request: Option<Uuid>,
@@ -184,9 +186,7 @@ impl App {
             .keys()
             .filter_map(|id| ThreadId::from_string(id).ok())
             .collect();
-        if !self.intent_task_panel.hydrated.contains(&root) {
-            ids.push(root);
-        }
+        ids.push(root);
         let targets: Vec<_> = ids
             .into_iter()
             .map(|id| (id, !self.intent_task_panel.hydrated.contains(&id)))
@@ -252,9 +252,15 @@ impl App {
                             self.intent_task_panel.tasks.activity(activity);
                         }
                     }
-                    self.intent_task_panel
-                        .tasks
-                        .snapshot(&snapshot.thread, snapshot.turn.as_ref());
+                    if id == root {
+                        if let Some(turn) = &snapshot.turn {
+                            self.intent_task_panel.tasks.parent_turn(turn, None);
+                        }
+                    } else {
+                        self.intent_task_panel
+                            .tasks
+                            .snapshot(&snapshot.thread, snapshot.turn.as_ref());
+                    }
                 }
                 Err(error) => {
                     tracing::warn!(%id, %error, "intent task panel refresh failed");
@@ -270,28 +276,24 @@ impl App {
     }
 
     pub(super) fn paint_intent_task_panel(&mut self, tui: &mut tui::Tui) {
-        let rows = self.intent_task_panel.tasks.rows();
+        let rows = self.intent_task_panel.tasks.visible_rows();
         let now = crate::intent_tasks::now_ms();
         let height = tui.terminal.size().map(|size| size.height).unwrap_or(24);
-        let limit = usize::from(height.saturating_sub(12) / 5).min(3);
-        let mut lines = Vec::new();
-        if !rows.is_empty() {
-            lines.push(Line::from(format!(
-                "子任务 ({}) · /subagents 查看全部及详情",
-                rows.len()
-            )));
-            for task in rows.iter().take(limit) {
-                lines.extend(task.lines(now).into_iter().map(Line::from));
-            }
-            if rows.len() > limit {
-                lines.push(Line::from(format!(
-                    "另有 {} 个子任务 · /subagents",
-                    rows.len() - limit
-                )));
-            }
+        let limit = usize::from(height.saturating_sub(12)).min(6);
+        self.chat_widget.intent_task_rows.rows = rows
+            .iter()
+            .take(limit)
+            .map(|task| crate::intent_task_rows::TaskRow {
+                id: task.thread_id.clone(),
+                title: task.title.clone(),
+                elapsed: task.compact_elapsed(now),
+                depth: task.path.matches('/').count().saturating_sub(2),
+            })
+            .collect();
+        self.chat_widget.intent_task_rows.overflow = rows.len().saturating_sub(limit);
+        if !rows.is_empty() || self.intent_task_panel.details.is_some() {
             tui.frame_requester()
                 .schedule_frame_in(Duration::from_secs(1));
         }
-        self.chat_widget.intent_task_panel_lines = lines;
     }
 }

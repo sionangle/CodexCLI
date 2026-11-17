@@ -165,6 +165,14 @@ pub(crate) enum HistoryRenderMode {
     Intent,
 }
 
+pub(crate) fn intent_hint_line(text: impl Into<String>) -> Line<'static> {
+    Line::from(vec![
+        Span::raw(text.into()),
+        Span::raw(" · ").dim(),
+        Span::raw("[查看详情]").cyan().underlined(),
+    ])
+}
+
 pub(crate) fn raw_lines_from_source(source: &str) -> Vec<Line<'static>> {
     if source.is_empty() {
         return Vec::new();
@@ -292,12 +300,18 @@ pub(crate) trait HistoryCell: std::fmt::Debug + Send + Sync + Any {
         }
     }
 
+    fn intent_details_available(&self) -> bool {
+        self.activity_ids().iter().any(|id| {
+            id.starts_with("exec:") || id.starts_with("mcp:") || id.starts_with("dynamic:")
+        })
+    }
+
     /// Presentation only: never change retained source, approval payloads, or model results.
     fn intent_hyperlink_lines(&self, width: u16) -> Vec<HyperlinkLine> {
         if self.activity_ids().iter().any(|id| {
             id.starts_with("exec:") || id.starts_with("mcp:") || id.starts_with("dynamic:")
         }) {
-            plain_hyperlink_lines(vec![Line::from("工具活动 · 展开查看详情")])
+            plain_hyperlink_lines(vec![intent_hint_line("工具活动")])
         } else {
             self.display_hyperlink_lines(width)
         }

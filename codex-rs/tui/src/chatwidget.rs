@@ -623,7 +623,7 @@ pub(crate) struct ChatWidget {
     running_commands: HashMap<String, RunningCommand>,
     collab_agent_metadata: HashMap<ThreadId, AgentMetadata>,
     pending_collab_spawn_requests: HashMap<String, multi_agents::SpawnRequestSummary>,
-    pub(crate) intent_task_panel_lines: Vec<ratatui::text::Line<'static>>,
+    pub(crate) intent_task_rows: crate::intent_task_rows::IntentTaskRows,
     suppressed_exec_calls: HashSet<String>,
     skills_all: Vec<SkillMetadata>,
     skills_initial_state: Option<HashMap<PathUri, bool>>,

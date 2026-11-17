@@ -4,6 +4,89 @@ use crate::intent_tasks::TaskStatus;
 use codex_app_server_protocol::ThreadStatus;
 use codex_app_server_protocol::TurnItemsView;
 
+fn mouse(kind: crossterm::event::MouseEventKind, x: u16, y: u16) -> TuiEvent {
+    TuiEvent::Mouse(crossterm::event::MouseEvent {
+        kind,
+        column: x,
+        row: y,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    })
+}
+
+#[tokio::test]
+async fn intent_task_click_opens_details_esc_restores_draft_and_drag_does_not_open() {
+    use crate::render::renderable::Renderable;
+    use crossterm::event::MouseButton::Left;
+    use crossterm::event::MouseEventKind::{Down, Drag, Up};
+    let mut app = super::test_support::make_test_app().await;
+    let mut tui = crate::tui::test_support::make_test_tui().unwrap();
+    app.chat_widget.insert_str("keep this draft");
+    app.intent_task_panel
+        .tasks
+        .discover("child", "/root/check_docs");
+    app.intent_task_panel
+        .tasks
+        .tasks
+        .get_mut("child")
+        .unwrap()
+        .purpose = Some("核对真实任务说明\n保留第二行".into());
+    app.paint_intent_task_panel(&mut tui);
+    let area = Rect::new(0, 8, 60, 1);
+    app.chat_widget
+        .intent_task_rows
+        .render(area, &mut ratatui::buffer::Buffer::empty(area));
+    assert!(
+        !app.handle_intent_detail_event(&mut tui, &mouse(Down(Left), 3, 8))
+            .unwrap()
+    );
+    app.handle_intent_detail_event(&mut tui, &mouse(Drag(Left), 4, 8))
+        .unwrap();
+    assert!(
+        !app.handle_intent_detail_event(&mut tui, &mouse(Up(Left), 3, 8))
+            .unwrap()
+    );
+    assert!(app.overlay.is_none());
+    app.handle_intent_detail_event(&mut tui, &mouse(Down(Left), 3, 8))
+        .unwrap();
+    assert!(
+        app.handle_intent_detail_event(&mut tui, &mouse(Up(Left), 3, 8))
+            .unwrap()
+    );
+    let Some(Overlay::Static(overlay)) = &mut app.overlay else {
+        panic!("missing task popup");
+    };
+    let area = Rect::new(0, 0, 80, 20);
+    let mut buffer = ratatui::buffer::Buffer::empty(area);
+    overlay.render(area, &mut buffer);
+    let text = buffer
+        .content
+        .iter()
+        .map(|c| c.symbol())
+        .collect::<String>()
+        .replace(' ', "");
+    assert!(text.contains("核对真实任务说明"));
+    assert!(text.contains("保留第二行"));
+    assert!(text.contains("/root/check_docs"));
+    app.overlay
+        .as_mut()
+        .unwrap()
+        .handle_event(
+            &mut tui,
+            TuiEvent::Key(crossterm::event::KeyEvent::new(
+                crossterm::event::KeyCode::Esc,
+                crossterm::event::KeyModifiers::NONE,
+            )),
+        )
+        .unwrap();
+    assert!(app.overlay.as_ref().unwrap().is_done());
+    app.close_transcript_overlay(&mut tui);
+    assert!(app.overlay.is_none());
+    assert_eq!(
+        app.chat_widget.composer_text_with_pending(),
+        "keep this draft"
+    );
+}
+
 #[tokio::test]
 async fn intent_task_panel_rejects_stale_root_refresh_and_renders_parallel_rows() {
     let mut app = super::test_support::make_test_app().await;
@@ -76,14 +159,15 @@ async fn intent_task_panel_rejects_stale_root_refresh_and_renders_parallel_rows(
     );
     let mut tui = crate::tui::test_support::make_test_tui().unwrap();
     app.paint_intent_task_panel(&mut tui);
-    let text = app
-        .chat_widget
-        .intent_task_panel_lines
+    let rows = &app.chat_widget.intent_task_rows.rows;
+    assert_eq!(rows.len(), 2);
+    let text = rows
         .iter()
-        .map(ToString::to_string)
+        .map(|row| format!("{} {}", row.title, row.elapsed))
         .collect::<Vec<_>>()
         .join("\n");
-    assert!(text.contains("子任务 (2)"));
+    assert!(text.contains("check source 00:02"));
+    assert!(!text.contains("任务说明"));
     assert!(!text.contains("/root/"));
     assert!(!text.contains("parent inherited text"));
 }

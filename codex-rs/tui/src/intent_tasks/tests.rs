@@ -116,6 +116,110 @@ fn progress(id: &str, text: &str, at: Option<i64>) -> ThreadItem {
 }
 
 #[test]
+fn intent_tasks_parent_reply_retires_finished_runs_but_keeps_archive_and_new_dispatch() {
+    let mut tasks = IntentTasks::default();
+    for id in ["done", "failed", "interrupted", "active"] {
+        tasks.discover(id, &format!("/root/{id}"));
+    }
+    for (id, status) in [
+        ("done", TurnStatus::Completed),
+        ("failed", TurnStatus::Failed),
+        ("interrupted", TurnStatus::Interrupted),
+        ("active", TurnStatus::InProgress),
+    ] {
+        let mut child = turn("first", 10, status.clone());
+        if status != TurnStatus::InProgress {
+            child.completed_at = Some(12);
+            child.duration_ms = Some(2000);
+        }
+        tasks
+            .tasks
+            .get_mut(id)
+            .unwrap()
+            .apply_turn(&child, Some(12000));
+    }
+    assert_eq!(tasks.visible_rows().len(), 4);
+    let mut parent = turn("reply", 9, TurnStatus::Completed);
+    parent.completed_at = Some(15);
+    tasks.parent_turn(&parent, Some(15000));
+    assert_eq!(
+        tasks
+            .visible_rows()
+            .iter()
+            .map(|t| t.thread_id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["active"]
+    );
+    assert_eq!(tasks.rows().len(), 4);
+    tasks
+        .tasks
+        .get_mut("done")
+        .unwrap()
+        .apply_turn(&turn("second", 20, TurnStatus::InProgress), Some(20000));
+    tasks.parent_turn(&parent, Some(25000));
+    assert_eq!(tasks.visible_rows().len(), 2);
+    let mut new_done = turn("second", 20, TurnStatus::Completed);
+    new_done.completed_at = Some(24);
+    tasks
+        .tasks
+        .get_mut("done")
+        .unwrap()
+        .apply_turn(&new_done, Some(24000));
+    tasks.parent_turn(&parent, Some(30000));
+    assert_eq!(
+        tasks.visible_rows().len(),
+        2,
+        "stale parent completion must not retire a newer run"
+    );
+}
+
+#[test]
+fn intent_tasks_replay_order_and_late_child_completion_respect_parent_reply_time() {
+    for parent_first in [false, true] {
+        let mut tasks = IntentTasks::default();
+        tasks.discover("child", "/root/review");
+        let mut parent = turn("parent", 9, TurnStatus::Completed);
+        parent.completed_at = Some(20);
+        let mut child = turn("child", 10, TurnStatus::Completed);
+        child.completed_at = Some(15);
+        if parent_first {
+            tasks.parent_turn(&parent, None);
+        }
+        tasks
+            .tasks
+            .get_mut("child")
+            .unwrap()
+            .apply_turn(&child, None);
+        if !parent_first {
+            tasks.parent_turn(&parent, None);
+        }
+        assert!(tasks.visible_rows().is_empty());
+        let mut late = turn("late", 21, TurnStatus::Completed);
+        late.completed_at = Some(25);
+        tasks
+            .tasks
+            .get_mut("child")
+            .unwrap()
+            .apply_turn(&late, None);
+        assert_eq!(tasks.visible_rows().len(), 1);
+    }
+}
+
+#[test]
+fn intent_tasks_details_retain_full_authored_text_and_duplicate_receipt_time() {
+    let mut task = IntentTask::new("child", "/root/review");
+    task.apply_turn(&turn("first", 10, TurnStatus::InProgress), None);
+    let full = format!("第一阶段\n{}\n最终细节", "完整内容".repeat(100));
+    let item = progress("plan", &full, Some(12000));
+    task.apply_item("first", &item, Some(13000));
+    task.apply_item("first", &item, Some(20000));
+    assert_eq!(task.progress.as_deref(), Some(full.as_str()));
+    assert_eq!(task.current, "第一阶段");
+    assert_eq!(task.progress_time(22000), "最近收到 9秒前");
+    assert_eq!(task.compact_elapsed(22000), "00:12");
+}
+
+#[test]
 fn intent_tasks_interruption_preserves_commentary_as_progress_not_a_result() {
     let mut task = IntentTask::new("child", "/root/check_docs");
     task.apply_turn(&turn("first", 10, TurnStatus::InProgress), None);

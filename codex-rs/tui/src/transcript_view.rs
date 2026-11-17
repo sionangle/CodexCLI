@@ -128,6 +128,35 @@ pub(crate) struct TranscriptView {
     turn_details: Option<turn_details::TurnDetails>,
 }
 
+impl TranscriptView {
+    pub(crate) fn intent_details_at(
+        &self,
+        x: u16,
+        y: u16,
+        cells: &[Arc<dyn HistoryCell>],
+    ) -> Option<usize> {
+        if self.mode != HistoryRenderMode::Intent
+            || self.detailed
+            || !self.area.contains((x, y).into())
+        {
+            return None;
+        }
+        let visible = self.visible.get(usize::from(y - self.area.y))?;
+        if !visible
+            .layout
+            .intent_details_at(visible.row, x - self.area.x)
+        {
+            return None;
+        }
+        if visible.key == EntryKey::Live {
+            return Some(cells.len());
+        }
+        cells
+            .iter()
+            .position(|cell| EntryKey::cell(cell) == visible.key && cell.intent_details_available())
+    }
+}
+
 impl Default for TranscriptView {
     fn default() -> Self {
         Self {

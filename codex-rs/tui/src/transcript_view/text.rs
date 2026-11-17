@@ -410,6 +410,21 @@ impl TextLayout {
     }
 
     /// Resolve a cell coordinate to a grapheme boundary, clamping padding to the row's text.
+    pub(super) fn intent_details_at(&self, row: usize, column: u16) -> bool {
+        let Some(display) = self.rows.get(row) else {
+            return false;
+        };
+        if usize::from(column) < display.first_column
+            || usize::from(column) >= line_width(&display.line.line)
+        {
+            return false;
+        }
+        let offset = self.position_at(row, column);
+        self.text
+            .match_indices("[查看详情]")
+            .any(|(start, label)| (start..start + label.len()).contains(&offset))
+    }
+
     pub(super) fn position_at(&self, row: usize, column: u16) -> usize {
         let Some(row) = self.rows.get(row) else {
             return self.text.len();
