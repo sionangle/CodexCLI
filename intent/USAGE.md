@@ -20,6 +20,29 @@ intent_view = true
 
 点击需要程序接管的全屏界面：`[tui] fullscreen_transcript = true`（默认）。不要使用 `--no-alt-screen`，也不要关闭 alternate screen。在终端自己管理的滚动历史中，程序无法可靠识别历史文本的屏幕位置；该模式使用 Ctrl+T 查看完整记录。无需修改官方配置。
 
+## 优先用补丁编辑并显示差异
+
+`intent.6` 已保留补丁工具的原生 diff 显示。普通 shell/Python/PowerShell 写文件不会自动变成补丁事件；当前上游的回合 diff 跟踪器只接收 `apply_patch` 产生的变更。仅提高工具选择偏好不等于自动捕获任意命令的文件修改。
+
+可以在 `codex-intent-maintain status` 指出的用户配置中添加以下**顶层**配置，放在 `[tui]` 等表之前。已有 `developer_instructions` 时，把规则追加到原字符串中，不要重复定义键或替换现有指令：
+
+```toml
+developer_instructions = '''
+[Patch-first editing and visible changes]
+For ordinary hand-written edits to text source files, use the dedicated apply_patch tool whenever it is available. This is the default editing workflow. Do not use Python, PowerShell, shell redirection, or whole-file rewrites merely for convenience, and do not invoke apply_patch through a shell when the dedicated tool is available.
+If a patch fails because its context is stale, reread the relevant file and retry a corrected patch before choosing another editing method.
+Shell commands remain appropriate for inspection, builds, tests, formatters, generated files, binary assets, and large mechanical transformations. Explicit user requests for another method take precedence over this preference.
+When an alternative editing method is necessary, briefly state why. Afterwards inspect the actual changed files and present the relevant real diff in an assistant message so it remains visible in intent view; do not rely only on hidden command stdout. Clearly distinguish pre-existing user changes from your edits and never invent a diff or undo/reapply changes solely to manufacture a patch display.
+When apply_patch already displays the diff, keep the accompanying explanation brief instead of repeating the same full patch.
+'''
+```
+
+当前任务结束后重新打开 CLI，并新建会话，以确保补充指令进入新会话。恢复旧会话可能沿用已有的指令上下文。该设置增加开发者消息中的编辑偏好，不替换模型的基础指令；它依然是模型行为引导，不是禁止所有 shell 写入的执行拦截器。
+
+在 Git 仓库中也可输入 `/diff` 打开差异页，按 Esc 返回。这里展示的是仓库差异，可能包含先前已有改动，不能直接当作本轮任务的改动清单。
+
+配置字段见 [上游配置定义](https://github.com/openai/codex/blob/rust-v0.169.0/codex-rs/config/src/config_toml.rs)，跟踪边界见 [上游回合 diff 跟踪器](https://github.com/openai/codex/blob/rust-v0.169.0/codex-rs/core/src/turn_diff_tracker.rs)。
+
 ## 子任务
 
 主界面每个子任务只占一行：**任务名称 + 分:秒**；嵌套任务缩进显示。时间缺失时显示 `--:--`。点击有下划线的任务名称查看目的、当前工作、最近进度、状态、结果和内部路径，Esc 返回。没有明文说明或历史进度时只在详情中说明缺失，不把缺失提示用作主界面标题。
