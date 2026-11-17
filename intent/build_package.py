@@ -44,7 +44,7 @@ def main():
         assets = prepare()
         environment = {**os.environ, **assets["environment"]}
         if not environment.get('CODEX_INTENT_CACHE_LEASE'):
-            raise RuntimeError('Use intent/Build-Intent.ps1 to serialize access to the shared compiler cache.')
+            raise RuntimeError('Use intent/Build-Intent.ps1 (Windows) or intent/build-intent (Linux) to hold the compiler cache lease.')
         environment["STABLE_GIT_COMMIT"] = subprocess.check_output(
             git + ["rev-parse", "HEAD"],
             cwd=REPO, text=True,

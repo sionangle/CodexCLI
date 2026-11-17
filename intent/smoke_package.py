@@ -1,4 +1,4 @@
-"""Exercise assembled Windows binaries with isolated data, without a model account.
+"""Exercise assembled native binaries with isolated data, without a model account.
 
 This is a binary smoke check, not a replacement for terminal or model scenarios.
 """

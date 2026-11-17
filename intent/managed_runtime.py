@@ -1,4 +1,4 @@
-"""Internal managed installation operations; the PowerShell entry holds the runtime lock.
+"""Internal managed installation operations; the native entry holds the runtime lock.
 
 Data generations are never reused across versions. Rollback copies the pre-switch snapshot;
 it never asks an old executable to open a newer database. Failed candidates stay unpublished.
@@ -43,7 +43,7 @@ def new_home(root):
     # while data generations use short opaque names. Never silently disable daemon support.
     home = contained(root, 'd/' + uuid.uuid4().hex[:8])
     if len(str(home / 'app-server-control/app-server-control.sock').encode('utf-8')) >= 108:
-        raise RuntimeError('Install path is too long for the Windows daemon socket. Choose a shorter installation directory.')
+        raise RuntimeError('Install path is too long for the daemon Unix socket. Choose a shorter installation directory.')
     return home
 
 

@@ -23,7 +23,7 @@ def refresh(profile, log_path):
         raise RuntimeError('Refusing to clean a compiler cache outside the owning project.')
     lease = Path(os.environ.get('CODEX_INTENT_CACHE_LEASE', 'missing'))
     if lease.parent.resolve() / lease.name != cache / 'build-test.lock':
-        raise RuntimeError('Use the PowerShell build or test entry to acquire the project cache lease.')
+        raise RuntimeError('Use the native build or test entry to acquire the project cache lease.')
     try:
         with lease.open('r+b') as stream:
             if not WINDOWS:

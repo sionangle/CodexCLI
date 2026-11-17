@@ -1,6 +1,6 @@
 # codex-intent 使用说明
 
-运行已验证交付目录中的 `codex-intent.cmd`；准确版本及验证范围以该目录的 `release.json` 为准。不要将内部 `package/bin` 加入 PATH，该目录包含辅助服务需要的 `codex.exe` 别名。升级和回滚流程见 [MAINTENANCE.md](MAINTENANCE.md)。
+Windows 运行已验证交付目录中的 `codex-intent.cmd`；Linux 的原生构建、运行与管理入口见 [LINUX.md](LINUX.md)。准确版本及验证范围以交付目录的 `release.json` 为准。不要将内部 `package/bin` 加入 PATH，该目录包含辅助服务需要的官方名称别名。升级和回滚流程见 [MAINTENANCE.md](MAINTENANCE.md)。
 
 ## 显示模式
 

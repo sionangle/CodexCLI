@@ -12,7 +12,7 @@ cd codex-intent
 git remote add upstream https://github.com/openai/codex.git
 ```
 
-构建缓存、配置、登录和会话数据不提交到仓库。下方保留上游说明供参考，其中的官方安装命令不用于安装这个定制版。
+Linux 开发入口及 Ubuntu 22.04 Docker 环境说明见 [intent/LINUX.md](intent/LINUX.md)。构建缓存、配置、登录和会话数据不提交到仓库。下方保留上游说明供参考，其中的官方安装命令不用于安装这个定制版。
 
 ---
 
