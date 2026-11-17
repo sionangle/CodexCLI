@@ -4,6 +4,7 @@ import errno
 import hashlib
 import os
 from pathlib import Path
+import re
 import subprocess
 from managed_runtime import read, write
 from upgrade import git
@@ -11,6 +12,32 @@ from platform_support import WINDOWS, cache_root, native_target
 
 REPO = Path(__file__).resolve().parent.parent
 TARGET = native_target()
+
+# These standalone maintenance/test scripts are not inputs to Cargo or native
+# build flags. Unknown files, build drivers, native sources and identity changes
+# still invalidate local artifacts. Validation itself is always rerun.
+NON_NATIVE_SCRIPTS = {
+    'intent/managed_runtime.py', 'intent/test_managed_runtime.py',
+    'intent/test_linux_maintenance.py', 'intent/cache_state.py',
+    'intent/test_cache_state.py',
+}
+
+
+def can_reuse_native_artifacts(repository, previous, current, dirty):
+    if dirty or not previous or previous.keys() != current.keys():
+        return False
+    if any(previous[key] != current[key] for key in current if key != 'commit'):
+        return False
+    old, new = previous['commit'], current['commit']
+    if not all(re.fullmatch('[0-9a-f]{40}', value or '') for value in [old, new]):
+        return False
+    # Disable rename detection: moving a Rust file to an allowed Python path
+    # must expose both the deleted native input and the added script.
+    result = git(repository, 'diff', '--no-renames', '--name-only', '-z', old, new, '--', check=False)
+    if result.returncode:
+        return False
+    changed = set(result.stdout.rstrip('\0').split('\0'))
+    return bool(changed) and changed.issubset(NON_NATIVE_SCRIPTS)
 
 
 def refresh(profile, log_path):
@@ -49,6 +76,16 @@ def refresh(profile, log_path):
     if not dirty and state['profiles'].get(profile) == identity:
         Path(log_path).write_text('Shared cache already belongs to this clean source and profile.\n', encoding='utf8')
         return {'status': 'matching-source', **identity}
+
+    previous = state['profiles'].get(profile)
+    if can_reuse_native_artifacts(REPO, previous, identity, dirty):
+        state['profiles'][profile] = identity
+        write(state_file, state)
+        Path(log_path).write_text('Only audited standalone maintenance/test scripts changed from '
+                                  + previous['commit'] + ' to ' + identity['commit']
+                                  + '. Native inputs, checkout, toolchain and lock are unchanged; '
+                                    'all build and validation commands still run.\n', encoding='utf8')
+        return {'status': 'matching-native-inputs', **identity}
 
     metadata = subprocess.run(['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'],
                               cwd=REPO / 'codex-rs', capture_output=True, encoding='utf8', check=True)
