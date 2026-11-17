@@ -30,6 +30,9 @@ def main():
     run.mkdir(parents=True)
     report = {'status': 'running', 'stage': int(args.stage), 'package': str(package), 'checks': [],
               'package_sha256': before, 'started_at': datetime.now(timezone.utc).isoformat()}
+    git = ['git', '-c', 'safe.directory=' + REPO.as_posix()]
+    report['harness_commit'] = subprocess.check_output(git + ['rev-parse', 'HEAD'], cwd=REPO, text=True).strip()
+    report['harness_source_clean_at_start'] = not subprocess.check_output(git + ['status', '--porcelain'], cwd=REPO, text=True)
 
     def probe(name, extra=()):
         result = subprocess.run([sys.executable, str(REPO / 'intent/acceptance' / (name + '.py')),
@@ -65,6 +68,12 @@ def main():
         report.update(status='failed', error=str(error))
         raise
     finally:
+        report['harness_commit_at_end'] = subprocess.check_output(git + ['rev-parse', 'HEAD'], cwd=REPO, text=True).strip()
+        report['harness_source_clean_at_end'] = not subprocess.check_output(git + ['status', '--porcelain'], cwd=REPO, text=True)
+        if report['status'] == 'passed-terminal-acceptance-only' and (
+                not report['harness_source_clean_at_start'] or not report['harness_source_clean_at_end']
+                or report['harness_commit_at_end'] != report['harness_commit']):
+            report['status'] = 'passed-terminal-diagnostic-only'
         report['finished_at'] = datetime.now(timezone.utc).isoformat()
         (run / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
         print(f'Terminal acceptance report: {run}', flush=True)

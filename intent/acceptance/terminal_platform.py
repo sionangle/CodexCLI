@@ -12,10 +12,23 @@ else:
     from ptyprocess import PtyProcessUnicode
 
     class PtyProcess:
+        def __init__(self, process):
+            self.process = process
+
         @staticmethod
         def spawn(args, **kwargs):
             kwargs.pop('backend', None)  # ConPTY backend selection is Windows-only.
-            return PtyProcessUnicode.spawn(args, **kwargs)
+            return PtyProcess(PtyProcessUnicode.spawn(args, **kwargs))
+
+        def __getattr__(self, name):
+            return getattr(self.process, name)
+
+        def close(self, force=False):
+            # BufferedRWPair.close waits on a concurrent blocking reader. Stop our test
+            # child first so PTY EOF wakes that reader before closing the stream.
+            if force and self.process.isalive():
+                self.process.terminate(force=True)
+            self.process.close(force=force)
 
 
 def long_command(*, started=True, failed=False):
