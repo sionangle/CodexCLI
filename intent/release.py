@@ -68,6 +68,12 @@ def assemble(repo, build_dir, validation_dir, smoke_dir, terminal_dir, destinati
     shutil.copy2(repo / 'intent/baseline.json', staging / 'upstream-baseline.json')
     if stage == 3 or maintenance_candidate:
         shutil.copytree(repo / 'intent', staging / 'intent', ignore=shutil.ignore_patterns('__pycache__'))
+        from prepare_runtime import prepare as prepare_runtime
+        runtime = prepare_runtime(repo)
+        shutil.copytree(runtime, staging / 'runtime')
+        runtime_evidence = evidence_root / 'private-runtime'
+        runtime_evidence.mkdir()
+        shutil.copy2(runtime.parent / 'report.json', runtime_evidence / 'report.json')
     # Stage delivery remains directly executable; managed installation is a separate explicit
     # action so verification never touches the user's official or production data.
     if WINDOWS:
@@ -95,7 +101,9 @@ def assemble(repo, build_dir, validation_dir, smoke_dir, terminal_dir, destinati
         launcher = staging / 'codex-intent'
         launcher.write_text('#!/usr/bin/env bash\nset -euo pipefail\n'
                             'intent_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"\n'
-                            'exec python3 -B "$intent_dir/portable_linux.py" "$@"\n', encoding='utf-8')
+                            'intent_python="$intent_dir/runtime/bin/python3"\n'
+                            'if [[ ! -x "$intent_python" ]]; then intent_python=python3; fi\n'
+                            'exec "$intent_python" -E -s -B -X utf8 "$intent_dir/portable_linux.py" "$@"\n', encoding='utf-8')
         launcher.chmod(0o755)
     text = f'''codex-intent {'Windows' if WINDOWS else 'Linux (Ubuntu 22.04+)'} x64 — stage {stage}
 Version: {build['version']}

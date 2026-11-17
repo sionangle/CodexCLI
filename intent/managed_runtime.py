@@ -114,9 +114,10 @@ def scoped_processes(root, tracked=()):
     script = r'''$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
 $base = [IO.Path]::GetFullPath($env:INTENT_PROCESS_ROOT).TrimEnd('\') + '\'
+$maintenancePid = [uint32]$env:INTENT_MAINTENANCE_PID
 $all = @(Get-CimInstance Win32_Process)
 $rows = @($all | Where-Object {
-    $_.ExecutablePath -and $_.ExecutablePath.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)
+    $_.ProcessId -ne $maintenancePid -and $_.ExecutablePath -and $_.ExecutablePath.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)
 })
 $ids = New-Object 'System.Collections.Generic.HashSet[uint32]'
 foreach ($row in $rows) { $null = $ids.Add($row.ProcessId) }
@@ -132,7 +133,7 @@ do {
 $output = @($rows | Select-Object ProcessId, ParentProcessId, Name, ExecutablePath)
 ConvertTo-Json -InputObject $output -Compress'''
     result = subprocess.run(['powershell.exe', '-NoProfile', '-Command', script],
-                            env=dict(os.environ, INTENT_PROCESS_ROOT=str(root)),
+                            env=dict(os.environ, INTENT_PROCESS_ROOT=str(root), INTENT_MAINTENANCE_PID=str(os.getpid())),
                             capture_output=True, encoding='utf-8', timeout=30, check=True)
     return json.loads(result.stdout or '[]')
 

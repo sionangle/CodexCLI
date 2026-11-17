@@ -10,6 +10,8 @@
 
 ## 管理安装与隔离
 
+日常使用见 [一条命令安装](INSTALL.md)，通过 `codex-intent-maintain status/update/rollback` 操作已发布包，无需开发工具。以下源码入口用于开发与适配，仍保留完整审核和验证门禁。
+
 在源码目录执行以下命令，`<交付目录>` 必须包含已验证的 `release.json` 和完整 package：
 
 ```powershell
@@ -47,7 +49,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\intent\Maintain-Intent.ps1
 
 验证使用目标 worktree 的 Rust 工具链、Cargo.lock 和上游二进制依赖锁。仅允许对齐上游锁中本地 workspace 包版本，外部依赖必须保持目标上游原样。linked worktree 共用主仓库的编译/下载缓存，仍按目标版本的锁逐项校验；配置、会话和报告独立。维护测试在主仓库同级的短 `mt-` / `ut-` / `ic-` 目录保存隔离安装、故障数据和故意冲突的 worktree，以满足 Windows socket 路径限制。完整构建、格式、核心断言、协议、配置、TUI、实际二进制/终端、升级与回滚验收必须通过。任何失败保留报告并停止发布，不切换当前版本。
 
-安装目录的维护入口可执行 `status`、`switch`、`rollback` 和 `quiesce`。若从交付包或管理安装运行 `check`、`adapt`、`validate` 等源码维护操作，须用 `--repository "<定制源码仓库>"` 指明 Git 仓库。不要把已发布二进制目录当作源码仓库。
+安装目录的维护入口可执行 `status`、`check`、`update`、`switch`、`rollback` 和 `quiesce`。`check` 可从已安装包查询官方版本；`adapt`、`validate` 等源码维护操作须用 `--repository "<定制源码仓库>"` 指明 Git 仓库。不要把已发布二进制目录当作源码仓库。
 
 构建和自动化测试共享独占编译缓存锁，多个 worktree 的操作会依次执行。缓存记录源码路径、提交、工具链和锁文件；来源切换时，按当前 workspace 清单清理本地包生成产物，保留外部依赖缓存，避免复用另一 worktree 的本地库或同名 exe。相同干净源码的连续构建与测试继续复用缓存。清理前核对缓存真实绝对路径和本地包归属，版本与完整包检查仍必须通过。使用 PowerShell 构建入口，不直接调用内部 `build_package.py`。
 

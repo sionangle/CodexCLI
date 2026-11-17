@@ -92,11 +92,7 @@ async fn intent_daemon_menu_blocks_updates_and_preserves_confirmed_restart() {
     insta::assert_snapshot!(overview.lines().find(|line| line.contains("Service v")).unwrap().trim(), @"Service v0.153.0 < Codex CLI v0.154.0 · /daemon");
     app.open_daemon_menu();
     let menu = render_bottom_popup(&app.chat_widget, 100);
-    assert!(menu.contains(if cfg!(windows) {
-        "Maintain-Intent.ps1"
-    } else {
-        "maintain-intent"
-    }));
+    assert!(menu.contains("codex-intent-maintain"));
     assert_eq!(app.pending_update_action, None);
     let mut terminal = crate::custom_terminal::Terminal::with_options(
         crate::test_backend::VT100Backend::new(/*width*/ 120, /*height*/ 30),
@@ -176,13 +172,8 @@ async fn intent_daemon_menu_blocks_updates_and_preserves_confirmed_restart() {
         .unwrap()
         .is_managed_daemon = false;
     app.open_daemon_menu();
-    let snapshot = if cfg!(windows) {
-        "daemon_unmanaged"
-    } else {
-        "daemon_unmanaged_linux"
-    };
     insta::assert_snapshot!(
-        snapshot,
+        "daemon_unmanaged",
         render_bottom_popup(&app.chat_widget, /*width*/ 80)
     );
     app.chat_widget.handle_key_event(KeyCode::Down.into());

@@ -4,7 +4,9 @@
 
 定制仓库为 [sionangle/CodexCLI](https://github.com/sionangle/CodexCLI)，维护分支为 `intent/stable`；`upstream` 保留官方仓库。定制版的 [当前交付状态](intent/STATUS.md)、[使用与构建说明](intent/USAGE.md)、[升级与回滚工具](intent/MAINTENANCE.md) 位于 `intent/`。
 
-Windows `intent.4` 已完成本地发布验收。当前 `intent.5` 增加工具与子任务的点击详情、Esc 返回、单行任务计时和完成后收起，针对性测试与真实终端诊断已通过，完整发布门禁仍在进行。Ubuntu 22.04 Docker 环境的 Linux 构建与维护支持正在补齐；此状态说明不代表 Linux 已验证。可用交付以附带报告的 `release.json` 为准。
+普通使用无需克隆源码或配置开发环境。`intent.6` 提供 Windows / Linux 预编译包与一条命令安装，安装后输入 `codex-intent` 即可启动；安装、更新和回滚命令见 [INSTALL.md](intent/INSTALL.md)。首次发布的安装验收正在进行，完成前 latest 下载地址尚不可用。
+
+`intent.5` 增加工具与子任务的点击详情、Esc 返回、单行任务计时和完成后收起；Ubuntu 22.04 Docker 已完成原生构建，两个平台均执行完整发布门禁。可用交付以附带报告的 `release.json` 为准。以下克隆步骤用于开发和上游适配。
 
 ```sh
 git clone --branch intent/stable https://github.com/sionangle/CodexCLI.git codex-intent

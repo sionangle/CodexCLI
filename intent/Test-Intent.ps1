@@ -115,6 +115,7 @@ try {
     Invoke-Check 'V2 protocol and schema contracts' @('test', '--locked', '-p', 'codex-app-server-protocol', '--lib') 323
     Invoke-Check 'maintenance idle state boundary' @('test', '--locked', '-p', 'codex-app-server-daemon', '--lib', 'intent_maintenance') 1
     Invoke-Check 'maintenance non-forcing drain' @('test', '--locked', '-p', 'codex-app-server', '--lib', 'intent_daemon_drain') 1
+    Invoke-Check 'maintenance socket identity' @('test', '--locked', '-p', 'codex-app-server-transport', '--lib', 'shutdown_is_only_accepted_on_managed_local_socket_for_its_own_pid') 1
     Invoke-Check 'maintenance CLI command' @('test', '--locked', '-p', 'codex-cli', '--bin', 'codex', 'intent_quiesce_subcommand_parses') 1
     $faultLog = Join-Path $run 'maintenance-faults.stderr.log'
     $faultProcess = Start-Process -FilePath (Get-Command python.exe).Source -ArgumentList @('-W', 'error::ResourceWarning', ('"' + (Join-Path $PSScriptRoot 'test_managed_runtime.py') + '"')) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $run 'maintenance-faults.stdout.log') -RedirectStandardError $faultLog

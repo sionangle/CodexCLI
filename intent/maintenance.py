@@ -7,8 +7,10 @@ import re
 import shutil
 import subprocess
 import sys
+import shlex
+import uuid
 sys.dont_write_bytecode = True  # Installed release directories remain immutable.
-from managed_runtime import checked_root, initialize, package_path, quiesce, read, stamp, transition, write
+from managed_runtime import checked_root, contained, initialize, package_path, quiesce, read, stamp, transition, write
 from upgrade import adapt, check_stable, git, replay, require_source
 from platform_support import WINDOWS
 
@@ -93,20 +95,33 @@ def validate(folder, previous_release, profile):
         write(run / 'report.json', report)
 
 
+def atomic_text(path, content, encoding='utf-8', executable=False):
+    temporary = path.with_name('.' + path.name + '-' + uuid.uuid4().hex[:8])
+    temporary.write_text(content, encoding=encoding)
+    if executable:
+        temporary.chmod(0o700)
+    os.replace(temporary, path)
+
+
 def install_launchers(root):
     source = Path(__file__).resolve().parent
     if not WINDOWS:
-        shutil.copy2(source / 'linux_entry.py', root / 'linux_entry.py')
+        atomic_text(root / 'linux_entry.py', (source / 'linux_entry.py').read_text(encoding='utf-8'))
+        state = read(root / 'state.json')
+        runtime = None
+        if state.get('manager'):
+            manager = contained(root, state['manager'])
+            runtime = manager.parent / 'runtime/bin/python3'
+        python = str(runtime) if runtime and runtime.is_file() else sys.executable
         for name, mode in [('codex-intent', 'run'), ('maintain-intent', 'maintain')]:
             launcher = root / name
-            launcher.write_text('#!/usr/bin/env bash\nset -euo pipefail\n'
-                                'intent_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"\n'
-                                f'exec python3 -B -u "$intent_dir/linux_entry.py" {mode} "$@"\n', encoding='utf-8')
-            launcher.chmod(0o700)
+            atomic_text(launcher, '#!/usr/bin/env bash\nset -euo pipefail\n'
+                        f'intent_dir={shlex.quote(str(root))}\n'
+                        f'exec {shlex.quote(python)} -E -s -B -X utf8 -u "$intent_dir/linux_entry.py" {mode} "$@"\n', executable=True)
         return
-    shutil.copy2(source / 'Run-CodexIntent.ps1', root / 'Run-CodexIntent.ps1')
-    (root / 'codex-intent.cmd').write_text('@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Run-CodexIntent.ps1" %*\r\n', encoding='ascii')
-    (root / 'Maintain-Intent.ps1').write_text('''param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+    atomic_text(root / 'Run-CodexIntent.ps1', (source / 'Run-CodexIntent.ps1').read_text(encoding='utf-8-sig'), 'utf-8-sig')
+    atomic_text(root / 'codex-intent.cmd', '@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Run-CodexIntent.ps1" %*\r\n', 'ascii')
+    atomic_text(root / 'Maintain-Intent.ps1', '''param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 $ErrorActionPreference = 'Stop'
 $state = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'state.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($state.format -ne 1 -or -not $state.manager) { throw 'Use the maintenance tool supplied with the verified custom release.' }
@@ -118,7 +133,7 @@ if (-not $manager.StartsWith($PSScriptRoot.TrimEnd('\\') + '\\', [StringComparis
 
 def main():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('action', choices=['status', 'check', 'adapt', 'continue', 'validate', 'install', 'switch', 'rollback', 'quiesce'])
+    parser.add_argument('action', choices=['status', 'check', 'update', 'adapt', 'continue', 'validate', 'install', 'switch', 'rollback', 'quiesce'])
     parser.add_argument('--install-root', type=Path, required=True)
     parser.add_argument('--repository', type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument('--tag')
@@ -145,7 +160,13 @@ def main():
         else:
             result['installation'] = 'not-installed'
     elif args.action == 'check':
-        result = check_stable(args.repository)
+        folder = None if (args.repository / '.git').exists() else contained(
+            checked_root(args.install_root), 'reports/official-releases')
+        result = check_stable(args.repository, folder)
+    elif args.action == 'update':
+        from published_update import update
+        result = update(checked_root(args.install_root))
+        install_launchers(checked_root(args.install_root))
     elif args.action == 'adapt':
         if not args.tag:
             parser.error('adapt requires --tag rust-vX.Y.Z')
@@ -168,8 +189,10 @@ def main():
         if not args.release:
             parser.error('switch requires --release <verified portable release>')
         result = transition(args.install_root, args.release)
+        install_launchers(checked_root(args.install_root))
     elif args.action == 'rollback':
         result = transition(args.install_root, rollback=True)
+        install_launchers(checked_root(args.install_root))
     else:
         root = checked_root(args.install_root)
         result = {}

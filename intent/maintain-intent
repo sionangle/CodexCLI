@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 intent_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 -B -u "$intent_dir/linux_entry.py" maintain "$@"
+intent_python="$intent_dir/../runtime/bin/python3"
+if [[ ! -x "$intent_python" ]]; then intent_python=python3; fi
+exec "$intent_python" -E -s -B -X utf8 -u "$intent_dir/linux_entry.py" maintain "$@"

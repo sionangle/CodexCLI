@@ -17,6 +17,10 @@ def scoped(root, tracked=()):
             if tail[0] == 'Z':
                 continue
             pid = int(folder.name)
+            # The exclusive maintenance holder now uses an interpreter inside the release.
+            # Exclude only this invocation, not other Python commands in the managed tree.
+            if pid == os.getpid():
+                continue
             name = text[text.find('(') + 1:text.rfind(')')]
             row = dict(ProcessId=pid, ParentProcessId=int(tail[1]), Name=name,
                        ExecutablePath=None, StartTicks=int(tail[19]), BootId=boot)

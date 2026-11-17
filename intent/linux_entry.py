@@ -78,7 +78,7 @@ def main():
     sys.path.insert(0, str(source))
     from maintenance import main as maintain
     sys.argv = [str(source / 'maintenance.py'), *(remaining or ['status']), '--install-root', str(root)]
-    if action not in ['install', 'switch', 'rollback', 'quiesce']:
+    if action not in ['install', 'update', 'switch', 'rollback', 'quiesce']:
         maintain()
         return 0
     if action == 'install' and not root.exists():

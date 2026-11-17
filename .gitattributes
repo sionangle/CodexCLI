@@ -4,4 +4,5 @@ third_party/voice/sources.json text eol=lf
 patches/v8_array_sort_elements_kind.patch text eol=lf
 intent/build-intent text eol=lf
 intent/maintain-intent text eol=lf
+intent/install.sh text eol=lf
 intent/Dockerfile.ubuntu22-build text eol=lf

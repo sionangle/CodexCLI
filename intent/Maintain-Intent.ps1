@@ -1,7 +1,7 @@
 [CmdletBinding(PositionalBinding = $false)]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('status', 'check', 'adapt', 'continue', 'validate', 'install', 'switch', 'rollback', 'quiesce')]
+    [ValidateSet('status', 'check', 'update', 'adapt', 'continue', 'validate', 'install', 'switch', 'rollback', 'quiesce')]
     [string]$Action,
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'codex-intent'),
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments
@@ -20,7 +20,7 @@ while ($ancestor) {
     }
     $ancestor = Split-Path -Parent $ancestor
 }
-$exclusive = $Action -in @('install', 'switch', 'rollback', 'quiesce')
+$exclusive = $Action -in @('install', 'update', 'switch', 'rollback', 'quiesce')
 $lease = $null
 try {
     if ($exclusive) {
@@ -41,7 +41,9 @@ try {
             $lease = [IO.File]::Open((Join-Path $root 'runtime.lock'), [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
         } catch { throw 'A managed Codex client or another maintenance operation is active. No version was switched.' }
     }
-    & python.exe -B -u (Join-Path $PSScriptRoot 'maintenance.py') $Action --install-root $root @Arguments
+    $python = Join-Path (Split-Path -Parent $PSScriptRoot) 'runtime\python.exe'
+    if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { $python = 'python.exe' }
+    & $python -E -s -B -X utf8 -u (Join-Path $PSScriptRoot 'maintenance.py') $Action --install-root $root @Arguments
     if ($LASTEXITCODE -ne 0) { throw 'Maintenance did not complete. Inspect the retained report and run status before retrying.' }
 } finally {
     if ($null -ne $lease) { $lease.Dispose() }

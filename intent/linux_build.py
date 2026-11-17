@@ -140,6 +140,7 @@ def test(env, profile):
         cargo_test('V2 protocol and schema contracts', 'codex-app-server-protocol', ['--lib'], minimum=323)
         cargo_test('maintenance idle state boundary', 'codex-app-server-daemon', ['--lib'], 'intent_maintenance')
         cargo_test('maintenance non-forcing drain', 'codex-app-server', ['--lib'], 'intent_daemon_drain')
+        cargo_test('maintenance socket identity', 'codex-app-server-transport', ['--lib'], 'shutdown_is_only_accepted_on_managed_local_socket_for_its_own_pid')
         cargo_test('maintenance CLI command', 'codex-cli', ['--bin', 'codex'], 'intent_quiesce_subcommand_parses')
         check('maintenance fault injection', [sys.executable, '-W', 'error::ResourceWarning', REPO / 'intent/test_managed_runtime.py'])
         check('Linux maintenance primitives', [sys.executable, '-W', 'error::ResourceWarning', REPO / 'intent/test_linux_maintenance.py'])

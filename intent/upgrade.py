@@ -44,10 +44,17 @@ def validation_workspace(repo):
     return common.parent.parent
 
 
-def check_stable(repo):
-    repo, baseline = require_source(repo)
+def check_stable(repo, report_folder=None):
+    repo = Path(repo).resolve(strict=True)
+    if (repo / '.git').exists():
+        repo, baseline = require_source(repo)
+    else:
+        baseline = read(repo / 'intent/baseline.json')
     report = {'status': 'checking', 'checked_at': stamp(), 'upstream': OFFICIAL, 'baseline': baseline}
-    folder = repo / '.intent-work/official-releases'
+    # Installed release files stay immutable. Source checks retain their usual workspace log.
+    if not (repo / '.git').exists() and report_folder is None:
+        raise RuntimeError('Installed version checks need a separate writable report directory.')
+    folder = repo / '.intent-work/official-releases' if report_folder is None else Path(report_folder)
     folder.mkdir(parents=True, exist_ok=True)
     try:
         request = Request('https://api.github.com/repos/openai/codex/releases/latest',

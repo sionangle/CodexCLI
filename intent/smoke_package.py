@@ -104,7 +104,7 @@ def main():
         check("cli-version", [cli, "--version"], "codex-intent " + version)
         check("cli-help", [cli, "--help"], "codex-intent")
         check("cli-features", [cli, "features", "list"], "code_mode")
-        guidance = "Maintain-Intent.ps1" if os.name == 'nt' else "maintain-intent"
+        guidance = "codex-intent-maintain"
         check("official-update-blocked", [cli, "update"], guidance, success=False)
         check("daemon-update-blocked", [cli, "app-server", "daemon", "update"], guidance, success=False)
         check("daemon-from-cli-blocked", [cli, "app-server", "daemon", "update", "--from-cli", "--yes"], guidance, success=False)

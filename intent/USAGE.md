@@ -1,6 +1,6 @@
 # codex-intent 使用说明
 
-Windows 运行已验证交付目录中的 `codex-intent.cmd`；Linux 的原生构建、运行与管理入口见 [LINUX.md](LINUX.md)。准确版本及验证范围以交付目录的 `release.json` 为准。不要将内部 `package/bin` 加入 PATH，该目录包含辅助服务需要的官方名称别名。升级和回滚流程见 [MAINTENANCE.md](MAINTENANCE.md)。
+普通使用按 [一条命令安装](INSTALL.md) 安装，然后输入 `codex-intent`。Linux 源码开发与 Docker 构建见 [LINUX.md](LINUX.md)。准确版本及验证范围以交付目录的 `release.json` 为准。不要将内部 `package/bin` 加入 PATH，该目录包含辅助服务需要的官方名称别名。源码升级和回滚流程见 [MAINTENANCE.md](MAINTENANCE.md)。
 
 ## 显示模式
 
@@ -30,7 +30,7 @@ intent_view = true
 
 ## 配置、登录与会话
 
-定制版默认使用 `%USERPROFILE%\.codex-intent`，本机通常为 `C:\Users\sion_\.codex-intent`。官方版继续使用 `%USERPROFILE%\.codex`。显式设置的 `CODEX_HOME` 仍会覆盖默认路径，运行前应确认它没有指向官方数据目录。
+一键安装使用安装根目录内 `d/<代号>` 的独立数据，运行 `codex-intent-maintain status` 查看配置路径；启动器会设置该目录。便携版默认使用 `~/.codex-intent`，官方版继续使用 `~/.codex`。直接绕过启动器执行内部二进制时，显式设置的 `CODEX_HOME` 仍会覆盖默认路径，不建议这样运行管理安装。
 
 不自动共享或导入用户级配置、登录、会话数据库与后台服务。首次正式运行应在定制版单独登录；如需复用模型、终端等普通配置，只迁移已确认支持的设置，不复制后台服务状态或正在使用的数据库。
 

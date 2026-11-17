@@ -5,8 +5,7 @@ expression: "render_bottom_popup(&app.chat_widget, 80)"
 ---
   Daemon
   Running daemon: v0.153.0
-  Use intent/Maintain-Intent.ps1 to validate, switch or roll back codex-intent
-  and its data.
+  Use codex-intent-maintain to update or roll back this CLI and its data.
 
 
 ›    Install latest public stable

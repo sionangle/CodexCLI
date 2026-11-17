@@ -121,7 +121,8 @@ def main():
     report['candidate_source_matches'] = read(args.candidate / 'release.json')['commit'] == report['source_commit']
     has_candidate_tools = (args.candidate / 'intent/maintenance.py').is_file()
     environment = dict(os.environ, PYTHONUTF8='1')
-    manager = REPO / 'intent' / ('Maintain-Intent.ps1' if WINDOWS else 'maintain-intent')
+    manager = (args.candidate if has_candidate_tools else REPO) / 'intent' / (
+        'Maintain-Intent.ps1' if WINDOWS else 'maintain-intent')
     rpc = None
     gate, requested = threading.Event(), threading.Event()
     response_count = 0
