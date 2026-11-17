@@ -45,6 +45,8 @@ class PublicationTests(unittest.TestCase):
         folder = self.root / name
         (folder / 'package/bin').mkdir(parents=True)
         (folder / 'package/bin' / executable('codex-intent')).write_bytes(b'UNIT FIXTURE ONLY')
+        (folder / 'intent').mkdir()
+        (folder / 'intent/maintenance.py').write_text('# UNIT FIXTURE: legacy tools, no bundled runtime\n')
         runtime.write(folder / 'package/codex-package.json', {'target': native_target()})
         runtime.write(folder / 'release.json', {'status': 'verified-stage-2-portable',
                       'features': sorted(runtime.REQUIRED_FEATURES), 'version': '0.169.0+intent.' + str(revision),
@@ -74,6 +76,8 @@ class PublicationTests(unittest.TestCase):
                 database.execute('CREATE TABLE changed_schema (new_column TEXT)')
             restored = runtime.transition(self.root, rollback=True)
         restored_home = self.root / restored['current']['home']
+        # Rolling back the CLI must not select legacy tools that need a system Python.
+        self.assertEqual(restored['manager'], upgraded['manager'])
         self.assertNotEqual(restored_home, current)
         self.assertEqual((restored_home / 'marker').read_text(), 'old-format-data')
         self.assertEqual((current / 'marker').read_text(), 'incompatible new data')

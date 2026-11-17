@@ -320,10 +320,14 @@ def transition(root, source=None, rollback=False):
         if scoped_processes(root):
             raise RuntimeError('Candidate or another managed process has not exited. Publication refused.')
         report['databases_after_migration'] = check_databases(candidate_home)
+        chosen_manager = chosen['release'] + '/intent' if (root / chosen['release'] / 'intent/maintenance.py').is_file() else None
+        # Keep the installed maintenance implementation when rolling the CLI/data back.
+        # Older releases may have tools but no private interpreter or newer state support.
+        manager = (state.get('manager') or chosen_manager) if rollback else (chosen_manager or state.get('manager'))
         after = {'format': 1, 'current': {'release': chosen['release'], 'home': report['new_home']},
                  'previous': {**backup_state, 'sha256': report['backup_sha256']},
                  'last_transaction': report_dir.relative_to(root).as_posix(),
-                 'manager': chosen['release'] + '/intent' if (root / chosen['release'] / 'intent/maintenance.py').is_file() else state.get('manager')}
+                 'manager': manager}
         report['after'] = after
         report['status'] = 'ready-to-commit'
         write(report_dir / 'report.json', report)
