@@ -1,6 +1,6 @@
 # 一条命令安装
 
-从本仓库已发布的 GitHub Release 下载原生程序，安装后执行 `codex-intent`。无需克隆源码或安装 Rust、Git、Node.js、Python。当前安装脚本进入发布流程；仓库首次发布完成后，以下 latest 地址才可使用。
+从本仓库已发布的 GitHub Release 下载原生程序，安装后执行 `codex-intent`。无需克隆源码或安装 Rust、Git、Node.js、Python。当前已发布 `0.169.0+intent.6`，Windows x64 与 Ubuntu 22.04 x86_64 均已完成原生验收。
 
 Linux x86_64（Ubuntu 22.04 或兼容环境）：
 

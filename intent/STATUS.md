@@ -1,5 +1,30 @@
 # codex-intent 当前交付状态
 
+## intent.6 一条命令安装已发布
+
+版本 `0.169.0+intent.6`：[GitHub Release](https://github.com/sionangle/CodexCLI/releases/tag/intent-v0.169.0-r6)。安装后运行 `codex-intent`，不需要自行配置 Rust、Git、Node.js 或 Python；日常更新与回滚用 `codex-intent-maintain`。准确命令见 [INSTALL.md](INSTALL.md)。
+
+二进制及验收源码为 `a797e7774a5285c5f8e612d037bcb536a2c10826`，上游 `rust-v0.169.0` / `d32063f96c2dff1dc96af839b3952abb6acfeda4`。之后的文档提交不改变已发布二进制。
+
+| 检查 | Windows x64 | Ubuntu 22.04 x86_64 |
+|---|---|---|
+| 原生完整构建、配置、协议、维护接口 | 通过 | 通过 |
+| 完整 TUI 回归 | 6072 通过，0 失败，4 ignored | 6135 通过，0 失败，4 ignored |
+| 五组真实终端场景 | 通过 | 通过 |
+| 活跃任务保护、空闲服务退出、实际升级和数据回滚 | 通过 | 通过 |
+| 实际下载安装、中文目录、无开发工具 PATH、重复安装、损坏包拒绝 | 通过 | 通过 |
+| 命令更新及回滚后的私有运行环境保留 | 通过 | 通过 |
+
+Linux 另在仅有基础系统、curl 和 CA 证书的干净 Ubuntu 容器中执行 curl 安装命令，并直接运行 `codex-intent --version/--help` 和维护状态命令。Windows 验收使用隔离安装目录，不更改宿主正式 PATH。验收没有使用用户登录或付费模型。
+
+Windows 首轮回归中，上游侧栏整合用例 `handle_start_side_seeds_navigation_before_thread_started` 曾出现一次 1 列偏差（87 / 88）。失败报告 `validation-20261117T085742027Z` 保留；同一源码下单独连续三次通过，随后在不并行运行终端尺寸探针的条件下完整复验通过。未修改断言或跳过检查，尚未确证该偶发偏差的根因。干净 Ubuntu 初次补充验收因本地验收脚本缺少 `done` 失败；修正脚本后在新容器完成安装验证，原失败证据保留。
+
+25 个定制提交在同一官方基线上完成重放演练；这不是对尚未发布的新上游版本的适配证明。当前升级冲突、坏包和活跃任务拒绝均保留原可用版本及失败报告。
+
+限制：当前只有 x64，使用 `dev-small` profile；默认 Docker 可能禁止嵌套用户 namespace，不能将界面及安装验证等同于生产沙箱验收。历史点击依赖默认全屏模式；任务收起依据父线程本轮结束，缺失描述明确显示未知。diff 与审批通过 Rust 渲染/交互检查，未另做真实终端端到端场景。完整说明见 [USAGE.md](USAGE.md)、[LINUX.md](LINUX.md) 和 [MAINTENANCE.md](MAINTENANCE.md)。
+
+以下保留各阶段的历史交付记录。
+
 ## intent.5 界面改进
 
 源码增加工具状态的可点击详情页、单行子任务名称与计时、点击任务详情及 Esc 返回。父线程本轮答复结束后收起已结束任务；保留归档及重新派发处理。具体操作与终端模式限制见 [USAGE.md](USAGE.md)。本节描述源码功能，不作为验证通过凭证；准确构建提交、测试结果和可用版本以交付目录的 `release.json` 与验证报告为准。

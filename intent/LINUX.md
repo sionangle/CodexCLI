@@ -1,6 +1,6 @@
 # Linux 开发与运行
 
-目标为 Ubuntu 22.04、x86_64，和 Windows 共用同一套 Rust 界面与数据聚合代码。Linux 使用原生 GNU 目标构建，保留完整包内的执行服务、代码宿主、ripgrep 和 bwrap。当前移植阶段以实际 `release.json` 和验收报告为准，源码存在不代表已完成 Linux 发布。
+目标为 Ubuntu 22.04、x86_64，和 Windows 共用同一套 Rust 界面与数据聚合代码。Linux 使用原生 GNU 目标构建，保留完整包内的执行服务、代码宿主、ripgrep 和 bwrap。`0.169.0+intent.6` 已完成原生构建、完整回归、真实终端、升级回滚和无开发工具的安装验证；普通使用见 [一条命令安装](INSTALL.md)。
 
 ## 在已有 Ubuntu 22.04 容器内开发
 

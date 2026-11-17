@@ -51,7 +51,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\intent\Maintain-Intent.ps1
 
 安装目录的维护入口可执行 `status`、`check`、`update`、`switch`、`rollback` 和 `quiesce`。`check` 可从已安装包查询官方版本；`adapt`、`validate` 等源码维护操作须用 `--repository "<定制源码仓库>"` 指明 Git 仓库。不要把已发布二进制目录当作源码仓库。
 
-构建和自动化测试共享独占编译缓存锁，多个 worktree 的操作会依次执行。缓存记录源码路径、提交、工具链和锁文件；来源切换时，按当前 workspace 清单清理本地包生成产物，保留外部依赖缓存，避免复用另一 worktree 的本地库或同名 exe。相同干净源码的连续构建与测试继续复用缓存。清理前核对缓存真实绝对路径和本地包归属，版本与完整包检查仍必须通过。使用 PowerShell 构建入口，不直接调用内部 `build_package.py`。
+构建和自动化测试共享独占编译缓存锁，多个 worktree 的操作会依次执行。缓存记录源码路径、提交、工具链和锁文件；来源切换时，按当前 workspace 清单清理本地包生成产物，保留外部依赖缓存，避免复用另一 worktree 的本地库或同名 exe。相同干净源码的连续构建与测试继续复用缓存。同一 checkout 只修改明确审核过的非原生维护 Python 文件时，允许保留 Rust 缓存；工具链、锁文件、目标、profile 仍须一致，Git 差异按不折叠重命名的方式检查，仍实际执行 Cargo 构建与完整测试。其他提交或来源变化仍清理本地包产物。清理前核对缓存真实绝对路径和本地包归属，版本与完整包检查仍必须通过。使用 PowerShell 构建入口，不直接调用内部 `build_package.py`。
+
+Windows 与 Linux 使用独立缓存、配置和报告，可同时验证；不同 worktree 共用同一编译缓存时仍持有独占锁。涉及同一安装目录的升级、回滚与后台服务检查按顺序执行。Windows 完整 TUI 回归保留单线程设置，因为内嵌服务用例共享进程状态；本次终端尺寸探针与该回归分开运行。
+
+从 PowerShell 7 经 Python 启动 Windows PowerShell 5.1 的验收脚本时，子进程应使用自身的系统模块目录；不要继承仅属于 PowerShell 7 的 `PSModulePath`。这只调整验收子进程，不修改用户配置。
 
 ## 空闲切换与回滚
 
@@ -70,7 +74,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\intent\Maintain-Intent.ps1
 
 ## 限制与前提
 
-- 当前支持并验证 Windows x64；Python 3.13、Git、PowerShell 和 MSVC 构建工具为维护依赖。普通便携启动仅需 PowerShell。
+- 已验证 Windows x64 与 Ubuntu 22.04 x86_64。普通安装使用预编译包和随包私有运行环境。源码开发才需要平台编译工具、Git、Python 及目标上游固定 Rust 工具链；Linux 构建依赖见 LINUX.md。
 - 上游 `dev-small` 是阶段构建 profile；可用 `validate --profile release` 跑完整性能构建门禁。
 - 对已有 `intent.1/intent.2` 后台服务，工具不假设它具备非强制 drain；运行中会拒绝迁移。不要强制结束活跃任务来绕过门禁。
 - 不支持外部程序绕过管理启动器并直接使用管理数据目录的并发访问。发现已有不明进程或状态时停止，而不是猜测可安全复制。
