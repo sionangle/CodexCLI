@@ -111,6 +111,8 @@ def main():
         check("executor-version", [package / "bin" / executable("codex-exec-server"), "--version"], version)
         check("code-host-help", [package / "bin" / executable("codex-code-mode-host"), "--help"], "--listen")
         check("ripgrep", [package / "codex-path" / executable("rg"), "--version"], "ripgrep")
+        if os.name != 'nt':
+            check("sandbox-helper", [package / "codex-resources/bwrap", "--version"], "bubblewrap")
         result = initialize_rpc([str(package / "bin" / executable("codex-exec-server")), "--listen", "stdio"],
                                 {"clientName": "intent-binary-smoke"}, environment, run, "executor")
         if not result.get("sessionId") or result["environmentInfo"]["executorVersion"] != version:

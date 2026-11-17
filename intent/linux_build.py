@@ -96,7 +96,9 @@ def test(env, profile):
                CARGO_TERM_COLOR='never', FORCE_COLOR='0', NO_COLOR='1', TERM='dumb')
     report = dict(status='running', scope='stage-3-automated', profile=profile, target=native_target(),
                   commit=commit, source_clean_at_start=clean, conditional_network_tests_enabled=True,
-                  temporary_directory=tempfile.gettempdir(), checks=[])
+                  temporary_directory=tempfile.gettempdir(), checks=[],
+                  platform={'os_release': Path('/etc/os-release').read_text(encoding='utf-8'),
+                            'kernel': os.uname().release, 'machine': os.uname().machine, 'uid': os.getuid()})
 
     def check(name, args, minimum=None):
         print('CHECK: ' + name, flush=True)
