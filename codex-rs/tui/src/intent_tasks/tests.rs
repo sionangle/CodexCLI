@@ -220,6 +220,20 @@ fn intent_tasks_details_retain_full_authored_text_and_duplicate_receipt_time() {
 }
 
 #[test]
+fn intent_tasks_failed_details_show_the_recorded_error() {
+    let mut task = IntentTask::new("child", "/root/review");
+    let mut failed = turn("first", 10, TurnStatus::Failed);
+    failed.error = Some(codex_app_server_protocol::TurnError {
+        message: "真实失败原因".into(),
+        additional_details: Some("具体诊断信息".into()),
+        codex_error_info: None,
+        misalignment: None,
+    });
+    task.apply_turn(&failed, Some(12000));
+    assert_eq!(task.result.as_deref(), Some("真实失败原因\n具体诊断信息"));
+}
+
+#[test]
 fn intent_tasks_interruption_preserves_commentary_as_progress_not_a_result() {
     let mut task = IntentTask::new("child", "/root/check_docs");
     task.apply_turn(&turn("first", 10, TurnStatus::InProgress), None);

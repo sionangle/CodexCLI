@@ -226,11 +226,11 @@ impl IntentTask {
                         .zip(self.completed_ms)
                         .map(|(start, end)| (end - start).max(0))
                 });
-            if turn.error.is_some() {
-                self.result = Some(format!(
-                    "任务{}；打开子任务详情查看原因",
-                    self.status.label()
-                ));
+            if let Some(error) = &turn.error {
+                self.result = Some(match &error.additional_details {
+                    Some(details) => format!("{}\n{details}", error.message),
+                    None => error.message.clone(),
+                });
             }
             self.current = format!("本次任务已{}", self.status.label());
         }

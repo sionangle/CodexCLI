@@ -262,13 +262,14 @@ trust_level = "trusted"
     def row(text, name):
         return any(re.fullmatch(r'\s*' + re.escape(name) + r'\s+(?:\d+:\d+|--:--)\s*', line) for line in text.splitlines())
     def detail(name, expected):
+        terminal.until(lambda text: row(text, name))
         terminal.click(name)
         terminal.until(lambda text: '子任务详情' in text and expected in text)
         terminal.save('details-' + name.replace(' ', '-'))
         return terminal.text()
     def close_detail():
         terminal.proc.write('\x1b')
-        terminal.until(lambda text: '子任务详情' not in text)
+        terminal.until(lambda text: '子任务详情' not in text and all(row(text, name) for name in ['freeze docs', 'runtime state', 'nested error']))
     try:
         terminal.until(lambda text: all(row(text, name) for name in ['freeze docs', 'runtime state', 'nested error']))
         terminal.save('parallel-running')
@@ -310,6 +311,7 @@ trust_level = "trusted"
         terminal.until(lambda text: '· 完成 ·' in text)
         close_detail()
         gates['final'].set()
+        terminal.proc.write('\x1b[F')
         terminal.until(lambda text: '已完成 V2 面板隔离验收' in text and not any(row(text, name) for name in ['freeze docs', 'runtime state', 'nested error']))
         terminal.save('finished-tasks-retired')
         assert 'RAW_V2_' not in clean(terminal.output)

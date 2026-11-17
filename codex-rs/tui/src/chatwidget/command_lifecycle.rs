@@ -45,7 +45,9 @@ impl ChatWidget {
             }
             // Unified exec may be parsed as Unknown; keep the working indicator visible regardless.
             self.bottom_pane.ensure_status_indicator();
-            if !is_standard_tool_call(&parsed_cmd) {
+            // Intent mode needs a visible detail entry even for an arbitrary long script.
+            // The retained exec cell also receives streaming output for the explicit popup.
+            if !is_standard_tool_call(&parsed_cmd) && !self.local_settings.tui.intent_view {
                 return;
             }
         }

@@ -490,6 +490,39 @@ async fn unified_exec_begin_restores_status_indicator_after_preamble() {
 }
 
 #[tokio::test]
+async fn intent_unknown_unified_script_has_running_details_without_raw_main_output() {
+    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(None).await;
+    chat.local_settings.tui.intent_view = true;
+    chat.on_task_started();
+    begin_unified_exec_startup(
+        &mut chat,
+        "intent-long-script",
+        "proc-1",
+        "hidden_script --arbitrary-args",
+    );
+    chat.on_exec_command_output_delta("intent-long-script", "hidden_stream_output\n");
+    let compact = chat
+        .active_cell_display_hyperlink_lines(80)
+        .unwrap()
+        .into_iter()
+        .map(|line| line.line.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(compact.contains("[查看详情]"));
+    assert!(!compact.contains("hidden_script"));
+    assert!(!compact.contains("hidden_stream_output"));
+    let (ids, lines) = chat.intent_live_details();
+    assert_eq!(ids, vec!["exec:intent-long-script"]);
+    let details = lines
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(details.contains("hidden_script"));
+    assert!(details.contains("hidden_stream_output"));
+}
+
+#[tokio::test]
 async fn unified_exec_begin_restores_working_status_snapshot() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
 
