@@ -8,7 +8,7 @@
 
 ```sh
 apt-get update
-apt-get install -y ca-certificates curl git build-essential pkg-config libssl-dev clang llvm \
+apt-get install -y ca-certificates curl git build-essential pkg-config libssl-dev libcap-dev clang llvm \
   cmake ninja-build protobuf-compiler python3 python3-pip python3-venv python3-tomli xz-utils unzip file
 ```
 

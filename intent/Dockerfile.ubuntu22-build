@@ -2,7 +2,7 @@
 FROM ubuntu:22.04@sha256:9abcaffc92a5279fff3a6a41635c0800ea33e528425fb389658806476e7defde
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git build-essential pkg-config libssl-dev clang llvm \
+    ca-certificates curl git build-essential pkg-config libssl-dev libcap-dev clang llvm \
     cmake ninja-build protobuf-compiler python3 python3-pip python3-venv python3-tomli \
     xz-utils unzip file sudo \
     && rm -rf /var/lib/apt/lists/*
