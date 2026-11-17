@@ -44,7 +44,8 @@ def main():
         def until(predicate):
             nonlocal output
             deadline = time.monotonic() + 60
-            while not predicate(clean(output)):
+            while (output.rfind('\x1b[?2026h') > output.rfind('\x1b[?2026l')
+                   or not predicate(clean(output))):
                 chunk = events.get(timeout=max(0, deadline - time.monotonic()))
                 if isinstance(chunk, Exception):
                     raise chunk
@@ -59,7 +60,9 @@ def main():
             if intent:
                 assert not any(marker in text for marker in markers)
                 report['checks'].append('resume-intent-keeps-tools-hidden')
+                redraw_start = len(output)
                 proc.setwinsize(25, 60)
+                until(lambda value: '已完成隔离显示测试' in clean(output[redraw_start:]))
                 proc.write('\x1b[5~')
                 proc.write('\x14')
                 proc.write('\x1b[H')
