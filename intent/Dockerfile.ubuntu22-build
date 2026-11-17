@@ -12,7 +12,7 @@ RUN mkdir /tmp/intent-git-build \
     && curl --fail --location https://www.kernel.org/pub/software/scm/git/git-2.55.1.tar.xz -o /tmp/intent-git-build/source.tar.xz \
     && printf '%s  %s\n' '7bc345dba23c9089fa71bcf4e793d13d204fdc99b96abc118b3a29c18159eb16' '/tmp/intent-git-build/source.tar.xz' | sha256sum -c - \
     && tar -xJf /tmp/intent-git-build/source.tar.xz -C /tmp/intent-git-build --strip-components=1 \
-    && make -C /tmp/intent-git-build -j4 prefix=/opt/codex-build-git NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install \
+    && make -C /tmp/intent-git-build -j4 prefix=/opt/codex-build-git NO_RUST=YesPlease NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install \
     && rm -rf /tmp/intent-git-build
 ENV PATH="/opt/codex-build-git/bin:${PATH}"
 RUN useradd --create-home --uid 1000 codex \
