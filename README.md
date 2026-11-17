@@ -2,7 +2,17 @@
 
 独立维护的 Codex CLI 定制项目，初始基线为官方 `rust-v0.169.0`。准确 commit 和修订号见 [intent/baseline.json](intent/baseline.json)。定制版使用 `codex-intent` 名称及独立用户数据目录。
 
-定制版的 [当前交付状态](intent/STATUS.md)、[使用与构建说明](intent/USAGE.md)、[验收记录](intent/VALIDATION.md) 位于 `intent/`。当前仍在第一阶段验证，尚未交付正式可运行包。下方保留上游说明供参考，其中的官方安装命令不用于安装这个定制版。
+定制仓库为 [sionangle/CodexCLI](https://github.com/sionangle/CodexCLI)，维护分支为 `intent/stable`；`upstream` 保留官方仓库。定制版的 [当前交付状态](intent/STATUS.md)、[使用与构建说明](intent/USAGE.md)、[升级与回滚工具](intent/MAINTENANCE.md) 位于 `intent/`。
+
+Windows `intent.4` 已完成本地发布验收。当前 `intent.5` 增加工具与子任务的点击详情、Esc 返回、单行任务计时和完成后收起，针对性测试与真实终端诊断已通过，完整发布门禁仍在进行。Ubuntu 22.04 Docker 环境的 Linux 构建与维护支持正在补齐；此状态说明不代表 Linux 已验证。可用交付以附带报告的 `release.json` 为准。
+
+```sh
+git clone --branch intent/stable https://github.com/sionangle/CodexCLI.git codex-intent
+cd codex-intent
+git remote add upstream https://github.com/openai/codex.git
+```
+
+构建缓存、配置、登录和会话数据不提交到仓库。下方保留上游说明供参考，其中的官方安装命令不用于安装这个定制版。
 
 ---
 

@@ -157,7 +157,7 @@ trust_level = "trusted"
         release.write_text('release', encoding='utf-8')
         text = until(lambda value: '已完成隔离显示测试' in value)
         assert not any(marker in text for marker in ('RAW_CMD_MARKER', 'RAW_STDOUT_MARKER', 'RAW_STDERR_MARKER'))
-        assert '退出码 7' in text and '展开详情查看原因' in text, 'No actionable failure status was painted'
+        assert '退出码 7' in text and '[查看详情]' in text, 'No actionable failure status and detail entry were painted'
         report['checks'].append('intent-error-summary-visible-without-raw-output')
         assert any('RAW_STDOUT_MARKER' in str(item.get('output', '')) for request in requests for item in request.get('input', []) if item.get('type') == 'function_call_output')
         assert 'Process running with session ID' not in json.dumps(requests[-1]), 'Expected ordinary foreground execution'
