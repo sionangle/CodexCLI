@@ -14,6 +14,8 @@ apt-get install -y ca-certificates curl git build-essential pkg-config libssl-de
 
 Python 3.10 使用发行版的 `python3-tomli` 读取 TOML；Python 3.11 及以上使用标准库。源码和编译缓存建议位于容器挂载的 Linux 文件系统或命名卷。构建前提交源码修改，候选包必须记录干净提交。
 
+上游部分 worktree 操作使用 Git 2.34 不支持的 `worktree list --porcelain -z`。提供的 Dockerfile 从官方固定 SHA256 源码构建 Git 2.55.1，验证报告记录实际 Git 版本；已有容器应同样准备兼容的 Git。普通安装不编译或替换用户 Git。Docker Desktop 的 WSL 内核不代表容器具有 Windows 剪贴板：默认按原生 Linux 处理，显式配置 WSL 互操作变量时仍保留该功能。
+
 ```sh
 git clone --branch intent/stable https://github.com/sionangle/CodexCLI.git codex-intent
 cd codex-intent

@@ -48,6 +48,8 @@ Docker 中应将安装根目录作为持久化卷保存（包括程序选择、�
 
 目前仅支持 Windows x64、Linux x86_64；尚无 ARM64、macOS 包。程序暂用上游 dev-small 构建配置，未作 release 性能优化。
 
+安装和普通启动不需要 Git；使用 Git 仓库与 worktree 功能时仍需兼容的 Git。Ubuntu 22.04 自带的 Git 2.34 不支持上游部分 worktree 参数；原生构建验收使用固定 Git 2.55.1。安装器不会替换已有 Git。
+
 ## 包来源与维护者发布
 
 包内私有 Python 来自 Astral `python-build-standalone` 的固定发布 `20261110` / CPython `3.13.18`，目标与发布者 SHA256 记录在 [runtime-manifest.json](runtime-manifest.json)，原有许可证保留在 `runtime/`。它不加入 PATH、不影响系统 Python，仅运行随包维护代码。

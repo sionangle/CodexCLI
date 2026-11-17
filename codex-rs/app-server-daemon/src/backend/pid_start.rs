@@ -150,6 +150,10 @@ impl PidBackend {
         if let Some((key, value)) = self.command_env() {
             command.env(key, value);
         }
+        #[cfg(target_os = "linux")]
+        if managed_app_server {
+            command.env(codex_app_server_transport::DAEMON_SHUTDOWN_SOCKET_ENV, "1");
+        }
 
         crate::background_command::set_working_directory(
             command.as_std_mut(),

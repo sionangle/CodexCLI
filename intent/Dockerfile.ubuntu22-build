@@ -4,8 +4,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git build-essential pkg-config libssl-dev libcap-dev clang llvm \
     cmake ninja-build protobuf-compiler python3 python3-pip python3-venv python3-tomli \
-    xz-utils unzip file sudo \
+    xz-utils unzip file sudo libcurl4-openssl-dev libexpat1-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
+# Ubuntu 22.04's Git 2.34 lacks upstream's worktree list -z support.
+# SHA256 is pinned to kernel.org/pub/software/scm/git/sha256sums.asc.
+RUN mkdir /tmp/intent-git-build \
+    && curl --fail --location https://www.kernel.org/pub/software/scm/git/git-2.55.1.tar.xz -o /tmp/intent-git-build/source.tar.xz \
+    && printf '%s  %s\n' '7bc345dba23c9089fa71bcf4e793d13d204fdc99b96abc118b3a29c18159eb16' '/tmp/intent-git-build/source.tar.xz' | sha256sum -c - \
+    && tar -xJf /tmp/intent-git-build/source.tar.xz -C /tmp/intent-git-build --strip-components=1 \
+    && make -C /tmp/intent-git-build -j4 prefix=/opt/codex-build-git NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install \
+    && rm -rf /tmp/intent-git-build
+ENV PATH="/opt/codex-build-git/bin:${PATH}"
 RUN useradd --create-home --uid 1000 codex \
     && mkdir /work && chown codex:codex /work
 USER codex

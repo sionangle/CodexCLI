@@ -294,18 +294,45 @@ pub fn normalize_pasted_path(pasted: &str) -> Option<PathBuf> {
 
 #[cfg(target_os = "linux")]
 pub(crate) fn is_probably_wsl() -> bool {
-    // Primary: Check /proc/version for "microsoft" or "WSL" (most reliable for standard WSL).
-    if let Ok(version) = std::fs::read_to_string("/proc/version") {
-        let version_lower = version.to_lowercase();
-        if version_lower.contains("microsoft") || version_lower.contains("wsl") {
-            return true;
-        }
+    wsl_environment_hint(
+        &std::fs::read_to_string("/proc/version").unwrap_or_default(),
+        Path::new("/.dockerenv").exists() || Path::new("/run/.containerenv").exists(),
+        std::env::var_os("WSL_DISTRO_NAME").is_some() || std::env::var_os("WSL_INTEROP").is_some(),
+    )
+}
+
+#[cfg(target_os = "linux")]
+fn wsl_environment_hint(version: &str, container: bool, explicit_interop: bool) -> bool {
+    // Docker Desktop shares WSL's kernel without providing Windows clipboard interop.
+    // Explicit interop still supports containers deliberately configured to use it.
+    let version = version.to_lowercase();
+    explicit_interop || (!container && (version.contains("microsoft") || version.contains("wsl")))
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod intent_container_tests {
+    use super::wsl_environment_hint;
+
+    #[test]
+    fn intent_container_does_not_infer_windows_clipboard_from_host_kernel() {
+        assert!(!wsl_environment_hint(
+            "Linux microsoft-standard-WSL2",
+            true,
+            false
+        ));
+        assert!(!wsl_environment_hint("Linux generic", true, false));
     }
 
-    // Fallback: Check WSL environment variables. This handles edge cases like
-    // custom Linux kernels installed in WSL where /proc/version may not contain
-    // "microsoft" or "WSL".
-    std::env::var_os("WSL_DISTRO_NAME").is_some() || std::env::var_os("WSL_INTEROP").is_some()
+    #[test]
+    fn intent_container_preserves_explicit_interop_and_real_wsl_detection() {
+        assert!(wsl_environment_hint("Linux generic", true, true));
+        assert!(wsl_environment_hint(
+            "Linux microsoft-standard-WSL2",
+            false,
+            false
+        ));
+        assert!(!wsl_environment_hint("Linux generic", false, false));
+    }
 }
 
 #[cfg(target_os = "linux")]

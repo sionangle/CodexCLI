@@ -25,7 +25,7 @@ try {
     if ($BinDirectory) { $parameters += @('--bin-dir', $BinDirectory) }
     if ($NoPath) { $parameters += '--no-path' }
     & (Join-Path $release 'runtime\python.exe') -E -s -B -X utf8 (Join-Path $release 'intent\install.py') @parameters
-    if ($LASTEXITCODE -ne 0) { throw 'Installation did not complete; the previous selected version was retained.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Installation did not complete. Inspect the error and installed status before retrying.' }
     $installed = Get-Content -LiteralPath $report -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $NoPath -and @($env:PATH -split ';') -notcontains $installed.bin) { $env:PATH = $installed.bin + ';' + $env:PATH }
 } finally {

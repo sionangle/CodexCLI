@@ -98,7 +98,8 @@ def test(env, profile):
                   commit=commit, source_clean_at_start=clean, conditional_network_tests_enabled=True,
                   temporary_directory=tempfile.gettempdir(), checks=[],
                   platform={'os_release': Path('/etc/os-release').read_text(encoding='utf-8'),
-                            'kernel': os.uname().release, 'machine': os.uname().machine, 'uid': os.getuid()})
+                            'kernel': os.uname().release, 'machine': os.uname().machine, 'uid': os.getuid(),
+                            'git_version': git(REPO, '--version').stdout.strip()})
 
     def check(name, args, minimum=None):
         print('CHECK: ' + name, flush=True)
