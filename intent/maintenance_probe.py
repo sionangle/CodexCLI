@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 import uuid
-from managed_runtime import hashes, isolated_environment, read, stamp, write
+from managed_runtime import SERVICE_IMAGES, hashes, isolated_environment, read, scoped_processes, stamp, write
 from upgrade import git, replay, validation_workspace
 from platform_support import WINDOWS, executable
 from wsproto import ConnectionType, WSConnection
@@ -152,6 +152,31 @@ def main():
             return command(name, [root / 'codex-intent', *extra])
         return command(name, ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                               root / 'Run-CodexIntent.ps1', *extra])
+
+    def wait_for_background_exit(label):
+        # Thread startup may synchronize plugins using Git. Wait for real idle
+        # without killing commands or allowing an unrelated refusal to pass the
+        # active-turn assertion below.
+        print('CHECK: ' + label, flush=True)
+        evidence = {'name': label, 'observed_processes': []}
+        report.setdefault('background_process_waits', []).append(evidence)
+        deadline, quiet_since = time.monotonic() + 120, None
+        observed = {}
+        while True:
+            pending = [row for row in scoped_processes(root) if row['Name'].lower() not in SERVICE_IMAGES]
+            now = time.monotonic()
+            if pending:
+                quiet_since = None
+                observed.update({row['ProcessId']: row for row in pending})
+                evidence['observed_processes'] = list(observed.values())
+            else:
+                quiet_since = now if quiet_since is None else quiet_since
+                if now - quiet_since >= 1:
+                    print('PASS: ' + label, flush=True)
+                    return
+            if now >= deadline:
+                raise RuntimeError('Owned background processes did not become idle: ' + label)
+            time.sleep(0.1)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -303,10 +328,13 @@ enabled = false
         cli = root / changed['current']['release'] / 'package/bin' / executable('codex-intent')
         rpc = RPC([cli, 'app-server', 'proxy', '--sock', new_home / 'app-server-control/app-server-control.sock'], new_home, run)
         thread = rpc.call('thread/start', {'cwd': str(run), 'approvalPolicy': 'never', 'sandbox': 'danger-full-access'})['thread']['id']
+        wait_for_background_exit('thread-startup-background-work-exited')
         turn = rpc.call('turn/start', {'threadId': thread, 'input': [{'type': 'text', 'text': 'Run isolated idle protection acceptance.', 'textElements': []}]})['turn']['id']
         assert requested.wait(60)
         before = (root / 'state.json').read_bytes()
-        maintain('quiesce', success=False, label='active-daemon-turn-refusal')
+        refusal = maintain('quiesce', success=False, label='active-daemon-turn-refusal')
+        assert 'Daemon cannot be safely quiesced' in refusal, 'Active-turn check must reach the real daemon idle boundary.'
+        assert 'a task is active or its state is uncertain; no stop was requested' in refusal
         assert (root / 'state.json').read_bytes() == before
         assert candidate_version in launch('daemon-still-alive', 'app-server', 'daemon', 'version')
         gate.set()
@@ -315,6 +343,8 @@ enabled = false
         rpc = None
         report['checks'].append('real-active-daemon-task-is-refused-and-finishes-without-interruption')
 
+        wait_for_background_exit('post-turn-background-work-exited')
+        report['checks'].append('owned-background-commands-exited-before-idle-rollback')
         maintain('rollback', label='rollback-with-idle-daemon')
         restored = read(root / 'state.json')
         restored_home = root / restored['current']['home']

@@ -79,6 +79,35 @@ class LinuxMaintenanceTests(unittest.TestCase):
             private_path(link / 'child')
         self.assertFalse((target / 'child').exists())
 
+    def test_snapshot_omits_arg0_aliases_but_preserves_other_temporary_data(self):
+        from managed_runtime import copy_home
+        home = self.root / 'data'
+        (home / 'sessions').mkdir(parents=True)
+        (home / 'sessions/one.jsonl').write_text('session evidence')
+        executable = self.root / 'selected-codex'
+        executable.write_text('outside the data home')
+        for namespace in ['arg0', 'arg0-linux', 'arg0-windows']:
+            aliases = home / 'tmp' / namespace / 'codex-arg0-example'
+            aliases.mkdir(parents=True)
+            (aliases / 'apply_patch').symlink_to(executable)
+        (home / 'tmp/keep.txt').write_text('unrelated temporary data')
+        for reset in [False, True]:
+            snapshot = self.root / ('snapshot-' + str(reset))
+            copy_home(home, snapshot, reset_daemon=reset)
+            self.assertEqual((snapshot / 'sessions/one.jsonl').read_text(), 'session evidence')
+            self.assertEqual((snapshot / 'tmp/keep.txt').read_text(), 'unrelated temporary data')
+            self.assertEqual(sorted(p.name for p in (snapshot / 'tmp').iterdir()), ['keep.txt'])
+
+    def test_snapshot_still_rejects_external_links_outside_arg0(self):
+        from managed_runtime import copy_home
+        home = self.root / 'data'
+        (home / 'sessions').mkdir(parents=True)
+        outside = self.root / 'outside.jsonl'
+        outside.write_text('must not be copied')
+        (home / 'sessions/escape.jsonl').symlink_to(outside)
+        with self.assertRaisesRegex(RuntimeError, 'leaves the isolated home'):
+            copy_home(home, self.root / 'snapshot')
+
 
 if __name__ == '__main__':
     unittest.main()

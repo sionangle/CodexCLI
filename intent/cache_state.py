@@ -19,7 +19,7 @@ TARGET = native_target()
 NON_NATIVE_SCRIPTS = {
     'intent/managed_runtime.py', 'intent/test_managed_runtime.py',
     'intent/test_linux_maintenance.py', 'intent/cache_state.py',
-    'intent/test_cache_state.py',
+    'intent/test_cache_state.py', 'intent/maintenance_probe.py',
 }
 
 

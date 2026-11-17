@@ -18,6 +18,10 @@ from platform_support import WINDOWS, digest_file, executable, native_target, re
 
 MARKER = 'codex-intent-managed-install-v1'
 REQUIRED_FEATURES = {'intent-view', 'v2-task-panel'}
+SERVICE_IMAGES = {'codex.exe', 'codex-intent.exe', 'codex-exec-server.exe', 'codex-code-mode-host.exe'} if WINDOWS else {
+    'codex', 'codex-intent', 'codex-exec-server', 'codex-code-mode-host',
+    'codex-exec-serv', 'codex-code-mode',  # Linux comm is truncated to 15 bytes.
+}
 
 
 def read(path):
@@ -149,16 +153,16 @@ def quiesce(root, selection, report):
     package = package_path(root, selection)
     home = contained(root, selection['home'])
     processes = scoped_processes(root)
+    report['owned_processes_before_quiesce'] = processes
     has_control_state = any((home / 'app-server-daemon').glob('*.pid')) or (home / 'app-server-control/app-server-control.sock').exists()
     if not processes and not has_control_state:
         report['daemon'] = 'no-owned-processes'
         return
-    service_images = {'codex.exe', 'codex-intent.exe', 'codex-exec-server.exe', 'codex-code-mode-host.exe'} if WINDOWS else {
-        'codex', 'codex-intent', 'codex-exec-server', 'codex-code-mode-host',
-        'codex-exec-serv', 'codex-code-mode',  # Linux comm is truncated to 15 bytes.
-    }
-    if any(row['Name'].lower() not in service_images for row in processes):
-        raise RuntimeError('A background command or owned child process is still active; no stop or switch was requested.')
+    pending = [row for row in processes if row['Name'].lower() not in SERVICE_IMAGES]
+    if pending:
+        names = ', '.join(str(row['ProcessId']) + ' (' + row['Name'] + ')' for row in pending)
+        raise RuntimeError('A background command or owned child process is still active; no stop or switch was requested. '
+                           'Wait for these processes to finish, then retry: ' + names)
     # The native command refuses active turns, uses an idempotent graceful drain, never kills,
     # and holds the daemon lifecycle lock. It also rejects remote control and updater races.
     result = subprocess.run([str(package / 'bin' / executable('codex-intent')), 'app-server', 'daemon', 'intent-quiesce'],
@@ -193,6 +197,10 @@ def copy_home(source, destination, reset_daemon=False):
                 rel = relative / child.name
                 # Socket rendezvous and startup locks are process state, not user/session data.
                 if rel.as_posix() == 'app-server-control':
+                    continue
+                # arg0 creates per-process aliases to the selected executable outside
+                # CODEX_HOME. They are regenerated at startup, never session data.
+                if rel.as_posix() in ['tmp/arg0', 'tmp/arg0-linux', 'tmp/arg0-windows']:
                     continue
                 # These are derived daemon install/control state. The complete backup keeps them;
                 # a new generation starts a fresh daemon from its selected CLI package.
