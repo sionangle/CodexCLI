@@ -14,6 +14,19 @@ from upgrade import git
 REPO = Path(__file__).resolve().parent.parent
 
 
+def runtime_filter(member, destination):
+    if not member.issym():
+        return tarfile.data_filter(member, destination)
+    # Ubuntu 22.04's backport checks a symlink relative to the archive root instead
+    # of its parent. Preserve path/type/ownership protections with the correct base.
+    filtered = tarfile.tar_filter(member, destination)
+    root = Path(destination).resolve()
+    target = (root / member.name).parent / member.linkname
+    if Path(member.linkname).is_absolute() or not target.resolve().is_relative_to(root):
+        raise RuntimeError('Private runtime link leaves the extraction directory: ' + member.name)
+    return filtered.replace(mode=None, uid=None, gid=None, uname=None, gname=None)
+
+
 def prepare(repository=REPO):
     repository = Path(repository).resolve(strict=True)
     manifest = read(repository / 'intent/runtime-manifest.json')
@@ -43,7 +56,7 @@ def prepare(repository=REPO):
         with tarfile.open(archive) as bundle:
             if any(not member.name.startswith('python/') for member in bundle.getmembers()):
                 raise RuntimeError('Unexpected private runtime archive layout.')
-            bundle.extractall(unpacked, filter='data')
+            bundle.extractall(unpacked, filter=runtime_filter)
         # The publisher uses internal aliases. Materialize them in the immutable release so
         # the same no-redirect file hash policy applies to the CLI and its private runtime.
         prepared = folder / ('p-' + uuid.uuid4().hex[:8])
