@@ -74,7 +74,7 @@ async fn connect_at(socket_path: &Path, url: &str) -> Result<WebSocketStream<Uni
     Ok(websocket)
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub(crate) async fn request_shutdown(socket_path: &Path, pid: u32) -> Result<()> {
     timeout(CONTROL_SOCKET_RESPONSE_TIMEOUT, async {
         let mut websocket = connect_at(socket_path, "ws://localhost/daemon/shutdown").await?;

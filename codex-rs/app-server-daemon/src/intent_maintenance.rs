@@ -118,7 +118,7 @@ async fn ensure_idle(path: &Path) -> Result<()> {
 }
 
 /// Unlike ordinary daemon stop, this operation never uses a forced-exit deadline.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 pub async fn quiesce_idle() -> Result<LifecycleOutput> {
     crate::ensure_supported_platform()?;
     let owner = Daemon::from_environment()?;
@@ -165,9 +165,9 @@ pub async fn quiesce_idle() -> Result<LifecycleOutput> {
         .await)
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 pub async fn quiesce_idle() -> Result<LifecycleOutput> {
-    anyhow::bail!("codex-intent maintenance is currently validated for Windows only")
+    anyhow::bail!("codex-intent maintenance supports Windows and Linux")
 }
 
 #[cfg(test)]

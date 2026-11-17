@@ -176,8 +176,13 @@ async fn intent_daemon_menu_blocks_updates_and_preserves_confirmed_restart() {
         .unwrap()
         .is_managed_daemon = false;
     app.open_daemon_menu();
+    let snapshot = if cfg!(windows) {
+        "daemon_unmanaged"
+    } else {
+        "daemon_unmanaged_linux"
+    };
     insta::assert_snapshot!(
-        "daemon_unmanaged",
+        snapshot,
         render_bottom_popup(&app.chat_widget, /*width*/ 80)
     );
     app.chat_widget.handle_key_event(KeyCode::Down.into());

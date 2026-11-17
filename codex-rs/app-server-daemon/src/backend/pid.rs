@@ -91,6 +91,44 @@ enum PidCommandKind {
 }
 
 impl PidBackend {
+    /// Linux maintenance uses the same local, PID-checked drain as Windows. A timeout
+    /// leaves the process running; it never enters the ordinary force-stop path.
+    #[cfg(target_os = "linux")]
+    pub(crate) async fn intent_graceful_stop(&self) -> Result<()> {
+        anyhow::ensure!(
+            matches!(self.command_kind, PidCommandKind::AppServer { .. }),
+            "maintenance drain requires an app-server"
+        );
+        let Some(record) = self.wait_for_pid_start().await? else {
+            return Ok(());
+        };
+        anyhow::ensure!(
+            matches!(
+                &record.process_identity,
+                Some(identity::ProcessIdentity::Linux { .. })
+            ) && self.record_is_active(&record).await?,
+            "daemon native identity cannot be confirmed before maintenance"
+        );
+        let home = self
+            .pid_file
+            .parent()
+            .and_then(Path::parent)
+            .context("daemon pid path has no Codex home")?;
+        let socket = codex_app_server_transport::app_server_control_socket_path(home)?;
+        crate::client::request_shutdown(socket.as_path(), record.pid).await?;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+        while self.record_is_active(&record).await? {
+            if tokio::time::Instant::now() >= deadline {
+                bail!(
+                    "daemon is still draining; no process was killed and no version may be switched"
+                );
+            }
+            sleep(STOP_POLL_INTERVAL).await;
+        }
+        self.refresh_after_stale_record(&record).await?;
+        Ok(())
+    }
+
     pub(crate) async fn running_executable_identity(&self) -> Result<Option<ExecutableIdentity>> {
         match self.read_pid_file_state().await? {
             PidFileState::Running(record) if self.record_is_active(&record).await? => {
