@@ -112,7 +112,7 @@ def test(env, profile):
             item['passed_tests'] = sum(map(int, re.findall(r'(?m)^test result: ok\. (\d+) passed;', output.read_text(encoding='utf-8'))))
             if item['passed_tests'] < minimum:
                 raise RuntimeError(name + ' did not execute the required tests.')
-        if name == 'maintenance fault injection':
+        if name in ['maintenance fault injection', 'Linux maintenance primitives']:
             text = output.read_text(encoding='utf-8')
             count = re.search(r'(?m)^Ran (\d+) tests? in ', text)
             if not count or int(count[1]) < 4 or not re.search(r'(?m)^OK$', text):
@@ -140,6 +140,7 @@ def test(env, profile):
         cargo_test('maintenance non-forcing drain', 'codex-app-server', ['--lib'], 'intent_daemon_drain')
         cargo_test('maintenance CLI command', 'codex-cli', ['--bin', 'codex'], 'intent_quiesce_subcommand_parses')
         check('maintenance fault injection', [sys.executable, '-W', 'error::ResourceWarning', REPO / 'intent/test_managed_runtime.py'])
+        check('Linux maintenance primitives', [sys.executable, '-W', 'error::ResourceWarning', REPO / 'intent/test_linux_maintenance.py'])
         cargo_test('V2 activity preview', 'codex-tui', ['--lib'], 'agent_status_', 3)
         cargo_test('configuration persistence', 'codex-tui', ['--lib'], 'config_panel')
         cargo_test('configuration types', 'codex-config', ['--lib'])
