@@ -13,6 +13,7 @@ import shutil
 import sqlite3
 import subprocess
 import uuid
+from platform_support import WINDOWS, digest_file, executable, native_target, redirected
 
 
 MARKER = 'codex-intent-managed-install-v1'
@@ -49,7 +50,7 @@ def new_home(root):
 def contained(root, relative):
     root = Path(root).resolve(strict=True)
     candidate = root / relative
-    if candidate.is_symlink() or candidate.is_junction():
+    if redirected(candidate):
         raise RuntimeError('Managed state must not redirect through a link: ' + str(candidate))
     resolved = candidate.resolve()
     if resolved == root or not resolved.is_relative_to(root):
@@ -63,12 +64,11 @@ def hashes(root):
     for directory, directories, files in os.walk(root, followlinks=False):
         for name in directories + files:
             path = Path(directory) / name
-            if path.is_symlink() or path.is_junction():
+            if redirected(path):
                 raise RuntimeError('Release package contains a redirect: ' + str(path))
         for name in files:
             path = Path(directory) / name
-            with path.open('rb') as stream:
-                result[path.relative_to(root).as_posix()] = hashlib.file_digest(stream, 'sha256').hexdigest()
+            result[path.relative_to(root).as_posix()] = digest_file(path)
     return result
 
 
@@ -84,6 +84,8 @@ def verify_release(folder):
     actual.pop('release.json')
     if actual != expected:
         raise RuntimeError('Release file set or SHA256 differs from acceptance evidence.')
+    if read(folder / 'package/codex-package.json')['target'] != native_target():
+        raise RuntimeError('Release target does not match this operating system and architecture.')
     if '+intent.' not in release['version']:
         raise RuntimeError('Official releases cannot replace codex-intent.')
     return release
@@ -104,7 +106,10 @@ def package_path(root, selection):
     return release / 'package'
 
 
-def scoped_processes(root):
+def scoped_processes(root, tracked=()):
+    if not WINDOWS:
+        from linux_processes import scoped
+        return scoped(root, tracked)
     # Filter inside PowerShell; no unrelated command lines, credentials or environment are read.
     script = r'''$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)
@@ -147,18 +152,21 @@ def quiesce(root, selection, report):
     if not processes and not has_control_state:
         report['daemon'] = 'no-owned-processes'
         return
-    service_images = {'codex.exe', 'codex-intent.exe', 'codex-exec-server.exe', 'codex-code-mode-host.exe'}
+    service_images = {'codex.exe', 'codex-intent.exe', 'codex-exec-server.exe', 'codex-code-mode-host.exe'} if WINDOWS else {
+        'codex', 'codex-intent', 'codex-exec-server', 'codex-code-mode-host',
+        'codex-exec-serv', 'codex-code-mode',  # Linux comm is truncated to 15 bytes.
+    }
     if any(row['Name'].lower() not in service_images for row in processes):
         raise RuntimeError('A background command or owned child process is still active; no stop or switch was requested.')
     # The native command refuses active turns, uses an idempotent graceful drain, never kills,
     # and holds the daemon lifecycle lock. It also rejects remote control and updater races.
-    result = subprocess.run([str(package / 'bin/codex-intent.exe'), 'app-server', 'daemon', 'intent-quiesce'],
+    result = subprocess.run([str(package / 'bin' / executable('codex-intent')), 'app-server', 'daemon', 'intent-quiesce'],
                             env=isolated_environment(home), cwd=root, capture_output=True,
                             encoding='utf-8', timeout=75)
     report['daemon_exit_code'] = result.returncode
     if result.returncode:
         raise RuntimeError('Daemon cannot be safely quiesced; current selection is unchanged. ' + result.stderr.strip())
-    remaining = scoped_processes(root)
+    remaining = scoped_processes(root, processes)
     if remaining:
         raise RuntimeError('Owned processes remain active; no snapshot or version switch was made. PIDs: ' +
                            ', '.join(str(row['ProcessId']) for row in remaining))
@@ -302,7 +310,7 @@ def transition(root, source=None, rollback=False):
         # changes the unpublished copy; the running selection and consistent backup stay intact.
         package = contained(root, chosen['release']) / 'package'
         from smoke_package import initialize_rpc
-        result = initialize_rpc([str(package / 'bin/codex-intent.exe'), 'app-server', '--listen', 'stdio://'],
+        result = initialize_rpc([str(package / 'bin' / executable('codex-intent')), 'app-server', '--listen', 'stdio://'],
                                 {'clientInfo': {'name': 'intent-maintenance', 'version': '1'},
                                  'capabilities': {'experimentalApi': True}},
                                 isolated_environment(candidate_home), report_dir, 'candidate-migration')

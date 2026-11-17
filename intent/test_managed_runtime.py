@@ -9,6 +9,7 @@ from unittest.mock import patch
 import uuid
 
 import managed_runtime as runtime
+from platform_support import executable, native_target
 from upgrade import validation_workspace
 
 
@@ -43,7 +44,8 @@ class PublicationTests(unittest.TestCase):
     def fixture(self, name, revision):
         folder = self.root / name
         (folder / 'package/bin').mkdir(parents=True)
-        (folder / 'package/bin/codex-intent.exe').write_bytes(b'UNIT FIXTURE ONLY')
+        (folder / 'package/bin' / executable('codex-intent')).write_bytes(b'UNIT FIXTURE ONLY')
+        runtime.write(folder / 'package/codex-package.json', {'target': native_target()})
         runtime.write(folder / 'release.json', {'status': 'verified-stage-2-portable',
                       'features': sorted(runtime.REQUIRED_FEATURES), 'version': '0.169.0+intent.' + str(revision),
                       'commit': str(revision) * 40, 'sha256': runtime.hashes(folder)})
@@ -92,7 +94,7 @@ class PublicationTests(unittest.TestCase):
     def test_state_paths_and_incomplete_releases_are_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'leaves the managed installation'):
             runtime.contained(self.root, '../escape')
-        (self.new / 'package/bin/codex-intent.exe').write_bytes(b'changed after validation')
+        (self.new / 'package/bin' / executable('codex-intent')).write_bytes(b'changed after validation')
         before = (self.root / 'state.json').read_bytes()
         with self.assertRaisesRegex(RuntimeError, 'SHA256 differs'):
             runtime.transition(self.root, self.new)

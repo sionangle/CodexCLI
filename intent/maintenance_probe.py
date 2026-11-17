@@ -14,6 +14,7 @@ import time
 import uuid
 from managed_runtime import hashes, isolated_environment, read, stamp, write
 from upgrade import git, replay, validation_workspace
+from platform_support import WINDOWS, executable
 from wsproto import ConnectionType, WSConnection
 from wsproto.events import AcceptConnection, CloseConnection, Ping, Request, TextMessage
 
@@ -120,7 +121,7 @@ def main():
     report['candidate_source_matches'] = read(args.candidate / 'release.json')['commit'] == report['source_commit']
     has_candidate_tools = (args.candidate / 'intent/maintenance.py').is_file()
     environment = dict(os.environ, PYTHONUTF8='1')
-    manager = REPO / 'intent/Maintain-Intent.ps1'
+    manager = REPO / 'intent' / ('Maintain-Intent.ps1' if WINDOWS else 'maintain-intent')
     rpc = None
     gate, requested = threading.Event(), threading.Event()
     response_count = 0
@@ -140,10 +141,14 @@ def main():
         return log.read_text(encoding='utf-8', errors='replace')
 
     def maintain(action, *extra, success=True, label=None):
+        if not WINDOWS:
+            return command(label or action, ['bash', manager, action, '--install-root', root, *extra], success)
         return command(label or action, ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass',
                                         '-File', manager, action, '-InstallRoot', root, *extra], success)
 
     def launch(name, *extra):
+        if not WINDOWS:
+            return command(name, [root / 'codex-intent', *extra])
         return command(name, ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                               root / 'Run-CodexIntent.ps1', *extra])
 
@@ -196,10 +201,17 @@ def main():
         report['checks'].append('real-previous-release-installed-with-isolated-data')
 
         # Same sharing primitive as the installed launcher; held by an independent real process.
-        holder = run / 'hold-launch-lease.ps1'
-        holder.write_text("$lease = [IO.File]::Open($env:INTENT_TEST_LOCK, 'Open', 'Read', 'Read')\n"
-                          "try { [Console]::WriteLine('LEASE_READY'); [Console]::ReadLine() | Out-Null } finally { $lease.Dispose() }\n", encoding='utf-8-sig')
-        process = subprocess.Popen(['powershell.exe', '-NoProfile', '-File', str(holder)],
+        holder = run / ('hold-launch-lease.ps1' if WINDOWS else 'hold-launch-lease.py')
+        if WINDOWS:
+            holder.write_text("$lease = [IO.File]::Open($env:INTENT_TEST_LOCK, 'Open', 'Read', 'Read')\n"
+                              "try { [Console]::WriteLine('LEASE_READY'); [Console]::ReadLine() | Out-Null } finally { $lease.Dispose() }\n", encoding='utf-8-sig')
+            holder_command = ['powershell.exe', '-NoProfile', '-File', str(holder)]
+        else:
+            holder.write_text("import fcntl, os\nwith open(os.environ['INTENT_TEST_LOCK'], 'rb') as stream:\n"
+                              "    fcntl.flock(stream, fcntl.LOCK_SH | fcntl.LOCK_NB)\n"
+                              "    print('LEASE_READY', flush=True)\n    input()\n", encoding='utf-8')
+            holder_command = [sys.executable, str(holder)]
+        process = subprocess.Popen(holder_command,
                                    env=dict(environment, INTENT_TEST_LOCK=str(root / 'runtime.lock')),
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         try:
@@ -287,7 +299,7 @@ enabled = false
 enabled = false
 ''', encoding='utf-8')
         launch('start-candidate-daemon', 'app-server', 'daemon', 'start')
-        cli = root / changed['current']['release'] / 'package/bin/codex-intent.exe'
+        cli = root / changed['current']['release'] / 'package/bin' / executable('codex-intent')
         rpc = RPC([cli, 'app-server', 'proxy', '--sock', new_home / 'app-server-control/app-server-control.sock'], new_home, run)
         thread = rpc.call('thread/start', {'cwd': str(run), 'approvalPolicy': 'never', 'sandbox': 'danger-full-access'})['thread']['id']
         turn = rpc.call('turn/start', {'threadId': thread, 'input': [{'type': 'text', 'text': 'Run isolated idle protection acceptance.', 'textElements': []}]})['turn']['id']
@@ -315,11 +327,15 @@ enabled = false
         report['checks'].append('idle-daemon-stopped-and-actual-rollback-restores-old-binary-and-pre-upgrade-format')
         report['checks'].append('newer-data-retained-separately-for-recovery')
         if has_candidate_tools:
-            status = json.loads(command('retained-maintenance-entry', ['powershell.exe', '-NoProfile',
-                    '-ExecutionPolicy', 'Bypass', '-File', root / 'Maintain-Intent.ps1', 'status']))
+            entry = ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+                     root / 'Maintain-Intent.ps1', 'status'] if WINDOWS else [root / 'maintain-intent', 'status']
+            status = json.loads(command('retained-maintenance-entry', entry))
             assert status['current_version'] == previous_version
             assert (root / restored['manager'] / 'maintenance.py').is_file()
-            report['checks'].append('installed-maintenance-entry-survives-rollback-to-version-without-tools')
+            if (args.previous / 'intent/maintenance.py').is_file():
+                report['checks'].append('installed-maintenance-entry-survives-rollback')
+            else:
+                report['checks'].append('installed-maintenance-entry-survives-rollback-to-version-without-tools')
         report['status'] = 'passed-maintenance-acceptance'
     except Exception as error:
         report.update(status='failed', error=repr(error))

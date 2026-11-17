@@ -6,6 +6,7 @@ import sys
 import tempfile
 import subprocess
 from pathlib import Path
+from platform_support import assets_manifest, cache_root, native_target
 
 REPO = Path(__file__).resolve().parents[1]
 WORK = REPO / ".intent-work"
@@ -22,18 +23,18 @@ def prepare():
                   'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd=REPO, text=True).strip()).resolve()
     if common.name != '.git':
         raise RuntimeError('Cannot establish the project binary dependency cache.')
-    cache = common.parent / '.intent-work/assets'
+    cache = cache_root(common.parent) / 'assets'
     cache.mkdir(parents=True, exist_ok=True)
     # Upstream's DotSlash downloader uses the process temp directory as its cache root.
     tempfile.tempdir = str(cache)
-    target = TARGET_SPECS["x86_64-pc-windows-msvc"]
+    target = TARGET_SPECS[native_target()]
     print("Checking upstream-pinned V8 archive, bindings and checksums...", flush=True)
     # Always verify against this checkout's pins, including when an earlier build
     # left V8 override variables in the invoking shell.
     environment = resolve_codex_v8_cargo_env(target, environ={}, cache_root=cache)
     print("Checking upstream-pinned ripgrep...", flush=True)
     result = {"environment": environment, "ripgrep": str(resolve_rg_bin(target, None))}
-    (WORK / "assets.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    assets_manifest(REPO).write_text(json.dumps(result, indent=2), encoding="utf-8")
     return result
 
 

@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True  # Installed release directories remain immutable.
 from managed_runtime import checked_root, initialize, package_path, quiesce, read, stamp, transition, write
 from upgrade import adapt, check_stable, git, replay, require_source
+from platform_support import WINDOWS
 
 
 def validate(folder, previous_release, profile):
@@ -59,6 +60,11 @@ def validate(folder, previous_release, profile):
             return path
 
     def ps(name, *args, marker=None):
+        if not WINDOWS:
+            action = {'Prepare-Build': 'prepare', 'Prepare-Validation': 'prepare-validation',
+                      'Build-Intent': 'build', 'Test-Intent': 'test'}[name]
+            args = ['--profile' if value == '-Profile' else value for value in args]
+            return command(name, ['bash', repo / 'intent/build-intent', action, *args], marker)
         return command(name, ['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                               repo / 'intent' / (name + '.ps1'), *args], marker)
     try:
@@ -89,6 +95,15 @@ def validate(folder, previous_release, profile):
 
 def install_launchers(root):
     source = Path(__file__).resolve().parent
+    if not WINDOWS:
+        shutil.copy2(source / 'linux_entry.py', root / 'linux_entry.py')
+        for name, mode in [('codex-intent', 'run'), ('maintain-intent', 'maintain')]:
+            launcher = root / name
+            launcher.write_text('#!/usr/bin/env bash\nset -euo pipefail\n'
+                                'intent_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"\n'
+                                f'exec python3 -B -u "$intent_dir/linux_entry.py" {mode} "$@"\n', encoding='utf-8')
+            launcher.chmod(0o700)
+        return
     shutil.copy2(source / 'Run-CodexIntent.ps1', root / 'Run-CodexIntent.ps1')
     (root / 'codex-intent.cmd').write_text('@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Run-CodexIntent.ps1" %*\r\n', encoding='ascii')
     (root / 'Maintain-Intent.ps1').write_text('''param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)

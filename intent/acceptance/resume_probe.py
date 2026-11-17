@@ -7,6 +7,7 @@ import queue
 import threading
 import time
 from terminal_probe import PtyProcess, REPO, clean
+from terminal_platform import WINDOWS, executable, long_command, task_command
 
 def main():
     parser = argparse.ArgumentParser()
@@ -29,7 +30,7 @@ def main():
         env = dict(os.environ, CODEX_HOME=str(home), TERM='xterm-256color')
         for key in ('OPENAI_API_KEY', 'CODEX_API_KEY'):
             env.pop(key, None)
-        proc = PtyProcess.spawn([str(args.package.resolve() / 'bin/codex-intent.exe'), 'resume', thread_id,
+        proc = PtyProcess.spawn([str(args.package.resolve() / 'bin' / executable('codex-intent')), 'resume', thread_id,
                                 '--no-daemon', '--no-alt-screen'], cwd=str(cwd), env=env, dimensions=(36, 110), backend=0)
         events = queue.Queue()
         output = ''

@@ -92,7 +92,11 @@ async fn intent_daemon_menu_blocks_updates_and_preserves_confirmed_restart() {
     insta::assert_snapshot!(overview.lines().find(|line| line.contains("Service v")).unwrap().trim(), @"Service v0.153.0 < Codex CLI v0.154.0 · /daemon");
     app.open_daemon_menu();
     let menu = render_bottom_popup(&app.chat_widget, 100);
-    assert!(menu.contains("Maintain-Intent.ps1"));
+    assert!(menu.contains(if cfg!(windows) {
+        "Maintain-Intent.ps1"
+    } else {
+        "maintain-intent"
+    }));
     assert_eq!(app.pending_update_action, None);
     let mut terminal = crate::custom_terminal::Terminal::with_options(
         crate::test_backend::VT100Backend::new(/*width*/ 120, /*height*/ 30),

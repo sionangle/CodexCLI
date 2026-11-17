@@ -17,8 +17,12 @@ pub const IS_INTENT_BUILD: bool = true;
 #[path = "../../intent-version.rs"]
 mod intent_version;
 pub use intent_version::INTENT_VERSION;
+#[cfg(windows)]
 pub const INTENT_UPDATE_GUIDANCE: &str =
     "Use intent/Maintain-Intent.ps1 to validate, switch or roll back codex-intent and its data.";
+#[cfg(not(windows))]
+pub const INTENT_UPDATE_GUIDANCE: &str =
+    "Use intent/maintain-intent to validate, switch or roll back codex-intent and its data.";
 
 /// Initialize build information from the commit stamped into the calling executable.
 ///

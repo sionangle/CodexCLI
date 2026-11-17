@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-import tomllib
+from platform_support import tomllib
 import uuid
 from urllib.request import Request, urlopen
 from managed_runtime import read, write, stamp

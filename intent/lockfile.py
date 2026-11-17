@@ -9,7 +9,7 @@ import argparse
 import json
 import re
 import subprocess
-import tomllib
+from platform_support import tomllib
 from pathlib import Path
 
 

@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / '.intent-work/terminal-tools'))
 from v2_terminal_probe import Terminal
+from terminal_platform import WINDOWS, executable, long_command, task_command
 
 def clean(data):
     data = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', data)
@@ -30,13 +31,7 @@ def main():
     home.mkdir(parents=True)
     cwd.mkdir()
     release = cwd / 'release-command'
-    command = (
-        "Set-Content -LiteralPath 'started-command' -Value 'started'; Write-Output 'RAW_STDOUT_MARKER'; "
-        "1..1000 | ForEach-Object { Write-Output ('RAW_STDOUT_MARKER_' + $_) }; "
-        "Write-Error 'RAW_STDERR_MARKER' -ErrorAction Continue; "
-        "while (-not (Test-Path -LiteralPath 'release-command')) { Start-Sleep -Milliseconds 100 }; "
-        "Write-Output 'RAW_FINISHED_MARKER' # RAW_CMD_MARKER " + 'long-command-content ' * 100
-    )
+    command = long_command(started=True, failed=False)
     requests = []
     model_count = 0
 
@@ -119,7 +114,7 @@ trust_level = "trusted"
     environment = dict(os.environ, CODEX_HOME=str(home), TERM='xterm-256color')
     for name in ('OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_SANDBOX_NETWORK_DISABLED'):
         environment.pop(name, None)
-    cli = args.package.resolve() / 'bin/codex-intent.exe'
+    cli = args.package.resolve() / 'bin' / executable('codex-intent')
     terminal = Terminal([str(cli), '--no-daemon', '执行隔离显示测试。'], cwd, environment, run, 'normal')
     proc = terminal.proc
     def until(predicate, timeout=90):
@@ -131,7 +126,7 @@ trust_level = "trusted"
         report['checks'].append('intent-running-hides-raw-markers')
         until(lambda value: '[查看详情]' in value)
         terminal.click('[查看详情]')
-        until(lambda value: '工具详情' in value and 'Set-Content' in value)
+        until(lambda value: '工具详情' in value and ('Set-Content' if WINDOWS else 'printf') in value)
         report['checks'].append('click-running-tool-opens-raw-command-popup')
         terminal.resize(25, 60)
         release.write_text('release', encoding='utf-8')
@@ -149,7 +144,7 @@ trust_level = "trusted"
         terminal.resize(40, 120)
         until(lambda value: '[查看详情]' in value)
         terminal.click('[查看详情]')
-        until(lambda value: '工具详情' in value and 'Set-Content' in value)
+        until(lambda value: '工具详情' in value and ('Set-Content' if WINDOWS else 'printf') in value)
         proc.write('\x1b[F')
         until(lambda value: 'RAW_FINISHED_MARKER' in value)
         proc.write('\x1b')

@@ -12,6 +12,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from platform_support import executable
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -85,7 +86,7 @@ def main():
     environment = {**os.environ, "CODEX_HOME": str(home)}
     for name in ("OPENAI_API_KEY", "CODEX_API_KEY"):
         environment.pop(name, None)
-    cli = package / "bin/codex-intent.exe"
+    cli = package / "bin" / executable("codex-intent")
     report = {"status": "running", "scope": "binary-smoke-only", "version": version,
               "package": str(package), "codex_home": str(home), "checks": []}
 
@@ -103,13 +104,14 @@ def main():
         check("cli-version", [cli, "--version"], "codex-intent " + version)
         check("cli-help", [cli, "--help"], "codex-intent")
         check("cli-features", [cli, "features", "list"], "code_mode")
-        check("official-update-blocked", [cli, "update"], "Maintain-Intent.ps1", success=False)
-        check("daemon-update-blocked", [cli, "app-server", "daemon", "update"], "Maintain-Intent.ps1", success=False)
-        check("daemon-from-cli-blocked", [cli, "app-server", "daemon", "update", "--from-cli", "--yes"], "Maintain-Intent.ps1", success=False)
-        check("executor-version", [package / "bin/codex-exec-server.exe", "--version"], version)
-        check("code-host-help", [package / "bin/codex-code-mode-host.exe", "--help"], "--listen")
-        check("ripgrep", [package / "codex-path/rg.exe", "--version"], "ripgrep")
-        result = initialize_rpc([str(package / "bin/codex-exec-server.exe"), "--listen", "stdio"],
+        guidance = "Maintain-Intent.ps1" if os.name == 'nt' else "maintain-intent"
+        check("official-update-blocked", [cli, "update"], guidance, success=False)
+        check("daemon-update-blocked", [cli, "app-server", "daemon", "update"], guidance, success=False)
+        check("daemon-from-cli-blocked", [cli, "app-server", "daemon", "update", "--from-cli", "--yes"], guidance, success=False)
+        check("executor-version", [package / "bin" / executable("codex-exec-server"), "--version"], version)
+        check("code-host-help", [package / "bin" / executable("codex-code-mode-host"), "--help"], "--listen")
+        check("ripgrep", [package / "codex-path" / executable("rg"), "--version"], "ripgrep")
+        result = initialize_rpc([str(package / "bin" / executable("codex-exec-server")), "--listen", "stdio"],
                                 {"clientName": "intent-binary-smoke"}, environment, run, "executor")
         if not result.get("sessionId") or result["environmentInfo"]["executorVersion"] != version:
             raise RuntimeError("Executor initialization has missing session or mismatched package version")

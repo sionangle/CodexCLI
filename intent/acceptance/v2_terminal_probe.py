@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 from terminal_probe import PtyProcess, REPO, clean
+from terminal_platform import WINDOWS, executable, long_command, task_command
 import pyte
 from wcwidth import wcwidth
 
@@ -126,11 +127,7 @@ def main():
     lock = threading.Lock()
     counts, turns, requests, threads = {}, {}, [], {}
 
-    def command(name):
-        return (f"Set-Content -LiteralPath 'started-{name}' -Value 'started'; "
-                f"Write-Output 'RAW_V2_STDOUT_{name}'; Write-Error 'RAW_V2_STDERR_{name}' -ErrorAction Continue; "
-                f"while (-not (Test-Path -LiteralPath 'release-{name}')) {{ Start-Sleep -Milliseconds 100 }}; "
-                f"Write-Output 'RAW_V2_DONE_{name}' # RAW_V2_COMMAND " + 'long-script ' * 100)
+    command = task_command
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -183,7 +180,7 @@ def main():
             elif agent.endswith('/nested_error'):
                 if count == 1:
                     events += [message('nested-progress', '已定位嵌套任务的事件来源。'),
-                        call('nested-trigger', 'exec_command', {'cmd': "Write-Output 'RAW_V2_NESTED_OUTPUT'", 'yield_time_ms': 1000})]
+                        call('nested-trigger', 'exec_command', {'cmd': ("Write-Output 'RAW_V2_NESTED_OUTPUT'" if WINDOWS else "echo RAW_V2_NESTED_OUTPUT"), 'yield_time_ms': 1000})]
                 else:
                     if not gates['fail_nested'].wait(90):
                         raise TimeoutError('terminal never authorized failure stage')
@@ -256,7 +253,7 @@ trust_level = "trusted"
     env = dict(os.environ, CODEX_HOME=str(home), TERM='xterm-256color')
     for key in ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_SANDBOX_NETWORK_DISABLED']:
         env.pop(key, None)
-    cli = str(args.package.resolve() / 'bin/codex-intent.exe')
+    cli = str(args.package.resolve() / 'bin' / executable('codex-intent'))
     terminal = Terminal([cli, '--no-daemon', '执行 V2 子任务面板隔离验收。'], cwd, env, run, 'live')
     report = {'status': 'running', 'package': str(args.package.resolve()), 'checks': []}
     def row(text, name):

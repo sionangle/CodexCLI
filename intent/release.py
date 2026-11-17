@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 from managed_runtime import hashes, read
+from platform_support import WINDOWS, native_target
 
 
 def assemble(repo, build_dir, validation_dir, smoke_dir, terminal_dir, destination, stage=2, maintenance=None,
@@ -69,26 +70,34 @@ def assemble(repo, build_dir, validation_dir, smoke_dir, terminal_dir, destinati
         shutil.copytree(repo / 'intent', staging / 'intent', ignore=shutil.ignore_patterns('__pycache__'))
     # Stage delivery remains directly executable; managed installation is a separate explicit
     # action so verification never touches the user's official or production data.
-    launcher = '''[CmdletBinding(PositionalBinding = $false)]
-param([string]$DataHome = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex-intent'),
-      [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
-$ErrorActionPreference = 'Stop'
-$data = [IO.Path]::GetFullPath($DataHome).TrimEnd('\\')
-$official = [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex')).TrimEnd('\\')
-if ($data -ieq $official -or $data.StartsWith($official + '\\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Use a separate codex-intent data directory.' }
-New-Item -ItemType Directory -Force -Path $data | Out-Null
-$file = Join-Path $data 'config.toml'
-if (-not (Test-Path -LiteralPath $file)) {
-    $stream = [IO.File]::Open($file, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
-    try { $bytes = [Text.Encoding]::UTF8.GetBytes("cli_auth_credentials_store = `"file`"`n[tui]`nintent_view = true`n"); $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
-}
-$original = $env:CODEX_HOME
-try { $env:CODEX_HOME = $data; & (Join-Path $PSScriptRoot 'package\\bin\\codex-intent.exe') @Arguments; $code = $LASTEXITCODE } finally { $env:CODEX_HOME = $original }
-exit $code
-'''
-    (staging / 'Run-CodexIntent.ps1').write_text(launcher, encoding='utf-8-sig')
-    (staging / 'codex-intent.cmd').write_text('@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Run-CodexIntent.ps1" %*\r\n', encoding='ascii')
-    text = f'''codex-intent Windows x64 — stage {stage}
+    if WINDOWS:
+        launcher = '''[CmdletBinding(PositionalBinding = $false)]
+    param([string]$DataHome = (Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex-intent'),
+          [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+    $ErrorActionPreference = 'Stop'
+    $data = [IO.Path]::GetFullPath($DataHome).TrimEnd('\\')
+    $official = [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex')).TrimEnd('\\')
+    if ($data -ieq $official -or $data.StartsWith($official + '\\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Use a separate codex-intent data directory.' }
+    New-Item -ItemType Directory -Force -Path $data | Out-Null
+    $file = Join-Path $data 'config.toml'
+    if (-not (Test-Path -LiteralPath $file)) {
+        $stream = [IO.File]::Open($file, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+        try { $bytes = [Text.Encoding]::UTF8.GetBytes("cli_auth_credentials_store = `"file`"`n[tui]`nintent_view = true`n"); $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+    }
+    $original = $env:CODEX_HOME
+    try { $env:CODEX_HOME = $data; & (Join-Path $PSScriptRoot 'package\\bin\\codex-intent.exe') @Arguments; $code = $LASTEXITCODE } finally { $env:CODEX_HOME = $original }
+    exit $code
+    '''
+        (staging / 'Run-CodexIntent.ps1').write_text(launcher, encoding='utf-8-sig')
+        (staging / 'codex-intent.cmd').write_text('@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Run-CodexIntent.ps1" %*\r\n', encoding='ascii')
+    else:
+        shutil.copy2(repo / 'intent/portable_linux.py', staging / 'portable_linux.py')
+        launcher = staging / 'codex-intent'
+        launcher.write_text('#!/usr/bin/env bash\nset -euo pipefail\n'
+                            'intent_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"\n'
+                            'exec python3 -B "$intent_dir/portable_linux.py" "$@"\n', encoding='utf-8')
+        launcher.chmod(0o755)
+    text = f'''codex-intent {'Windows' if WINDOWS else 'Linux (Ubuntu 22.04+)'} x64 — stage {stage}
 Version: {build['version']}
 Upstream: {build['baseline']['tag']} / {build['baseline']['commit']}
 Custom source: {build['commit']}
@@ -106,6 +115,11 @@ validation 包含实际检查报告和终端记录；原报告路径指向构建
 diff 和审批已通过 Rust 渲染及交互检查，尚未单独进行真实终端端到端验收。
 测试使用隔离配置、会话和本地模拟模型，没有使用用户登录或付费模型。
 '''
+    if not WINDOWS:
+        text = text.replace('运行 .\\codex-intent.cmd，查看版本 .\\codex-intent.cmd --version。',
+                            '运行 ./codex-intent，查看版本 ./codex-intent --version。')
+        text = text.replace('exe', '程序').replace('package\\bin', 'package/bin')
+        text = text.replace('%USERPROFILE%\\.codex-intent', '~/.codex-intent（CODEX_INTENT_HOME 可覆盖）')
     if stage == 2:
         text += '\n第二阶段已交付；升级、切换和回滚工具仍在开发，尚未完成整个项目。\n'
         if maintenance_candidate:
@@ -116,7 +130,7 @@ diff 和审批已通过 Rust 渲染及交互检查，尚未单独进行真实终
     release = {'status': 'verified-stage-2-portable' if stage == 2 else 'verified-custom-release',
                'scope': 'intent-view-and-v2-panel' if stage == 2 else 'custom-cli-and-maintenance',
                'version': build['version'], 'commit': build['commit'], 'upstream': build['baseline'],
-               'profile': build['profile'], 'features': ['intent-view', 'v2-task-panel'], 'sha256': hashes(staging)}
+               'profile': build['profile'], 'target': native_target(), 'features': ['intent-view', 'v2-task-panel'], 'sha256': hashes(staging)}
     if stage == 3:
         release['features'].append('managed-upgrade-and-rollback')
     (staging / 'release.json').write_text(json.dumps(release, ensure_ascii=False, indent=2), encoding='utf-8')

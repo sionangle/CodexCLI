@@ -8,13 +8,9 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from platform_support import digest_file as digest, executable, native_target
 
 REPO = Path(__file__).resolve().parent.parent
-
-
-def digest(path):
-    with path.open('rb') as source:
-        return hashlib.file_digest(source, 'sha256').hexdigest()
 
 
 def main():
@@ -23,11 +19,10 @@ def main():
     parser.add_argument('--stage', choices=['1', '2'], default='2')
     args = parser.parse_args()
     package = args.package.resolve()
-    if os.name != 'nt':
-        raise RuntimeError('This acceptance driver requires Windows ConPTY.')
+    native_target()
     if 'CODEX_SANDBOX_NETWORK_DISABLED' in os.environ:
         raise RuntimeError('Run outside the sandbox without the inherited network skip marker.')
-    binary = package / 'bin/codex-intent.exe'
+    binary = package / 'bin' / executable('codex-intent')
     before = {str(path.relative_to(package)): digest(path) for path in package.rglob('*') if path.is_file()}
     if not before or not binary.is_file():
         raise RuntimeError('A complete built candidate package is required.')

@@ -7,16 +7,17 @@ from pathlib import Path
 import subprocess
 from managed_runtime import read, write
 from upgrade import git
+from platform_support import WINDOWS, cache_root, native_target
 
 REPO = Path(__file__).resolve().parent.parent
-TARGET = 'x86_64-pc-windows-msvc'
+TARGET = native_target()
 
 
 def refresh(profile, log_path):
     common = Path(git(REPO, 'rev-parse', '--path-format=absolute', '--git-common-dir').stdout.strip()).resolve(strict=True)
     if common.name != '.git':
         raise RuntimeError('Cannot establish the owning project cache.')
-    cache = common.parent / '.intent-work'
+    cache = cache_root(common.parent)
     target = Path(os.environ['CARGO_TARGET_DIR']).resolve()
     if target != (cache / 'target').resolve():
         raise RuntimeError('Refusing to clean a compiler cache outside the owning project.')
@@ -24,12 +25,16 @@ def refresh(profile, log_path):
     if lease.parent.resolve() / lease.name != cache / 'build-test.lock':
         raise RuntimeError('Use the PowerShell build or test entry to acquire the project cache lease.')
     try:
-        with lease.open('r+b'):
+        with lease.open('r+b') as stream:
+            if not WINDOWS:
+                import fcntl
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(stream, fcntl.LOCK_UN)
             raise RuntimeError('The exclusive project cache lease is not held.')
     except OSError as error:
         # Python's Windows CRT may expose sharing violation 32 as EACCES without winerror.
         # The checked path is the lease opened by our parent PowerShell entry, not user data.
-        if error.errno != errno.EACCES or getattr(error, 'winerror', None) not in (None, 32):
+        if (WINDOWS and (error.errno != errno.EACCES or getattr(error, 'winerror', None) not in (None, 32))) or (not WINDOWS and error.errno not in (errno.EAGAIN, errno.EACCES)):
             raise
 
     identity = {'repository': str(REPO.resolve()), 'commit': git(REPO, 'rev-parse', 'HEAD').stdout.strip(),

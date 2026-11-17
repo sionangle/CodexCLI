@@ -7,7 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
-import tomllib
+from platform_support import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +16,7 @@ from codex_package.layout import build_package_dir, validate_package_dir
 from codex_package.targets import PACKAGE_VARIANTS, TARGET_SPECS, PackageInputs
 from lockfile import verify as verify_lockfile
 from cache_state import refresh as refresh_cache
+from platform_support import WINDOWS, digest_file, executable, native_target
 
 
 def main():
@@ -48,9 +49,9 @@ def main():
             git + ["rev-parse", "HEAD"],
             cwd=REPO, text=True,
         ).strip()
-        spec = TARGET_SPECS["x86_64-pc-windows-msvc"]
-        bins = ["codex", "codex-code-mode-host", "codex-exec-server",
-                "codex-command-runner", "codex-windows-sandbox-setup"]
+        spec = TARGET_SPECS[native_target()]
+        bins = ["codex", "codex-code-mode-host", "codex-exec-server"]
+        bins += ["codex-command-runner", "codex-windows-sandbox-setup"] if WINDOWS else ["bwrap"]
         report['workspace_cache'] = refresh_cache(args.profile, run / 'workspace-cache.log')
         verify_lockfile()
         command = ["cargo", "build", "--locked", "--profile", args.profile, "--target", spec.target]
@@ -63,17 +64,18 @@ def main():
                            stdout=log, stderr=subprocess.STDOUT, check=True)
         output = Path(environment["CARGO_TARGET_DIR"]) / spec.target / args.profile
         inputs = PackageInputs(
-            entrypoint_bin=output / "codex.exe", code_mode_host_bin=output / "codex-code-mode-host.exe",
-            exec_server_bin=output / "codex-exec-server.exe", rg_bin=Path(assets["ripgrep"]), bwrap_bin=None,
-            codex_command_runner_bin=output / "codex-command-runner.exe",
-            codex_windows_sandbox_setup_bin=output / "codex-windows-sandbox-setup.exe",
+            entrypoint_bin=output / executable("codex"), code_mode_host_bin=output / executable("codex-code-mode-host"),
+            exec_server_bin=output / executable("codex-exec-server"), rg_bin=Path(assets["ripgrep"]),
+            bwrap_bin=None if WINDOWS else output / "bwrap",
+            codex_command_runner_bin=output / "codex-command-runner.exe" if WINDOWS else None,
+            codex_windows_sandbox_setup_bin=output / "codex-windows-sandbox-setup.exe" if WINDOWS else None,
         )
         package = run / "package"
         package.mkdir()
         # Preserve the upstream internal package layout for daemon/helper resolution.
         # Only the codex-intent entrypoint is installed onto the user's PATH.
         build_package_dir(package, version, PACKAGE_VARIANTS["codex"], spec, inputs)
-        shutil.copy2(package / "bin/codex.exe", package / "bin/codex-intent.exe")
+        shutil.copy2(package / "bin" / executable("codex"), package / "bin" / executable("codex-intent"))
         shutil.copy2(REPO / "LICENSE", package / "LICENSE")
         shutil.copy2(REPO / "NOTICE", package / "NOTICE")
         validate_package_dir(package, PACKAGE_VARIANTS["codex"], spec)
@@ -83,18 +85,17 @@ def main():
         validation_home.mkdir()
         isolated_environment = {**environment, "CODEX_HOME": str(validation_home)}
         actual_version = subprocess.check_output(
-            [str(package / "bin/codex-intent.exe"), "--version"],
+            [str(package / "bin" / executable("codex-intent")), "--version"],
             env=isolated_environment, text=True,
         ).strip()
         if actual_version != "codex-intent " + version:
             raise RuntimeError("Compiled version does not match package metadata: " + actual_version)
         report.update(status="built-unvalidated", version=version, baseline=baseline,
-                      commit=environment["STABLE_GIT_COMMIT"])
+                      commit=environment["STABLE_GIT_COMMIT"], target=spec.target)
         report["sha256"] = {}
         for path in package.rglob("*"):
             if path.is_file():
-                with path.open("rb") as artifact:
-                    report["sha256"][str(path.relative_to(package))] = hashlib.file_digest(artifact, "sha256").hexdigest()
+                report["sha256"][str(path.relative_to(package))] = digest_file(path)
         print("Candidate built, not published: " + str(package), flush=True)
     except Exception as error:
         report.update(status="failed", error=str(error))
