@@ -141,8 +141,9 @@ trust_level = "trusted"
         assert 'Process running with session ID' not in json.dumps(requests[-1]), 'Expected ordinary foreground execution'
         report['checks'].append('ordinary-command-finished-without-background-yield')
         report['checks'].append('model-input-retains-execution-output')
+        redraw_start = len(terminal.output)
         terminal.resize(40, 120)
-        until(lambda value: '[查看详情]' in value)
+        until(lambda value: '[查看详情]' in value and '已完成隔离显示测试' in clean(terminal.output[redraw_start:]))
         terminal.click('[查看详情]')
         until(lambda value: '工具详情' in value and ('Set-Content' if WINDOWS else 'printf') in value)
         proc.write('\x1b[F')

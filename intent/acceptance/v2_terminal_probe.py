@@ -71,7 +71,10 @@ class Terminal:
 
     def until(self, predicate, timeout=90):
         deadline = time.monotonic() + timeout
-        while not predicate(self.text()):
+        # A PTY read is not a rendered frame. Codex brackets synchronized updates with
+        # DEC 2026; do not inspect a half-cleared popup after Escape or click stale cells.
+        while (self.output.rfind('\x1b[?2026h') > self.output.rfind('\x1b[?2026l')
+               or not predicate(self.text())):
             chunk = self.events.get(timeout=max(0, deadline - time.monotonic()))
             if isinstance(chunk, Exception):
                 raise chunk
