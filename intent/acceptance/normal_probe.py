@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / '.intent-work/terminal-tools'))
-from winpty import PtyProcess
+from v2_terminal_probe import Terminal
 
 def clean(data):
     data = re.sub(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)', '', data)
@@ -104,6 +104,7 @@ request_max_retries = 0
 stream_max_retries = 0
 [tui]
 intent_view = true
+fullscreen_transcript = true
 animations = false
 [features]
 code_mode = false
@@ -119,50 +120,42 @@ trust_level = "trusted"
     for name in ('OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_SANDBOX_NETWORK_DISABLED'):
         environment.pop(name, None)
     cli = args.package.resolve() / 'bin/codex-intent.exe'
-    proc = PtyProcess.spawn([str(cli), '--no-daemon', '--no-alt-screen', '执行隔离显示测试。'],
-                           cwd=str(cwd), env=environment, dimensions=(36, 110), backend=0)
-    events = queue.Queue()
-    output = ''
-    def reader():
-        try:
-            while True:
-                events.put(proc.read(65536))
-        except Exception as error:
-            events.put(error)
-    threading.Thread(target=reader, daemon=True).start()
+    terminal = Terminal([str(cli), '--no-daemon', '执行隔离显示测试。'], cwd, environment, run, 'normal')
+    proc = terminal.proc
     def until(predicate, timeout=90):
-        nonlocal output
-        deadline = time.monotonic() + timeout
-        while not predicate(clean(output)):
-            try:
-                chunk = events.get(timeout=min(0.2, max(0, deadline - time.monotonic())))
-            except queue.Empty:
-                if time.monotonic() >= deadline:
-                    raise TimeoutError('Terminal state deadline exceeded')
-                continue
-            if isinstance(chunk, Exception):
-                raise chunk
-            output += chunk
-            (run / 'terminal.vt').write_text(output, encoding='utf-8')
-            if '\x1b[6n' in chunk:
-                proc.write('\x1b[1;1R')
-        return clean(output)
+        return terminal.until(predicate, timeout)
     report = {'status': 'running', 'run': str(run), 'package': str(args.package.resolve()), 'checks': []}
     try:
         text = until(lambda value: (cwd / 'started-command').exists())
         assert not any(marker in text for marker in ('RAW_CMD_MARKER', 'RAW_STDOUT_MARKER', 'RAW_STDERR_MARKER'))
         report['checks'].append('intent-running-hides-raw-markers')
-        proc.setwinsize(25, 60)
-        proc.write('\x1b[5~')
+        until(lambda value: '[查看详情]' in value)
+        terminal.click('[查看详情]')
+        until(lambda value: '工具详情' in value and 'Set-Content' in value)
+        report['checks'].append('click-running-tool-opens-raw-command-popup')
+        terminal.resize(25, 60)
         release.write_text('release', encoding='utf-8')
-        text = until(lambda value: '已完成隔离显示测试' in value)
+        proc.write('\x1b[F')
+        until(lambda value: 'RAW_FINISHED_MARKER' in value)
+        report['checks'].append('running-detail-popup-follows-completed-invocation')
+        proc.write('\x1b')
+        text = until(lambda value: '工具详情' not in value and '已完成隔离显示测试' in value)
         assert not any(marker in text for marker in ('RAW_CMD_MARKER', 'RAW_STDOUT_MARKER', 'RAW_STDERR_MARKER'))
         report['checks'].append('intent-completed-resize-scroll-hides-raw-markers')
         assert any('RAW_STDOUT_MARKER' in str(item.get('output', '')) for request in requests for item in request.get('input', []) if item.get('type') == 'function_call_output')
         assert 'Process running with session ID' not in json.dumps(requests[-1]), 'Expected ordinary foreground execution'
         report['checks'].append('ordinary-command-finished-without-background-yield')
         report['checks'].append('model-input-retains-execution-output')
-        proc.setwinsize(40, 120)
+        terminal.resize(40, 120)
+        until(lambda value: '[查看详情]' in value)
+        terminal.click('[查看详情]')
+        until(lambda value: '工具详情' in value and 'Set-Content' in value)
+        proc.write('\x1b[F')
+        until(lambda value: 'RAW_FINISHED_MARKER' in value)
+        proc.write('\x1b')
+        text = until(lambda value: '工具详情' not in value and '已完成隔离显示测试' in value)
+        assert 'RAW_' not in text
+        report['checks'].append('completed-tool-click-and-esc-restores-intent-view')
         proc.write('\x14')
         proc.write('\x1b[H')
         until(lambda value: 'RAW_STDOUT_MARKER' in value or 'RAW_CMD_MARKER' in value, timeout=30)
@@ -173,9 +166,9 @@ trust_level = "trusted"
         raise
     finally:
         release.touch(exist_ok=True)
-        (run / 'terminal.txt').write_text(clean(output), encoding='utf-8')
+        (run / 'terminal.txt').write_text(clean(terminal.output), encoding='utf-8')
         (run / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-        proc.close(force=True)
+        terminal.close()
         server.shutdown()
         print('Terminal diagnostic:', run, flush=True)
 

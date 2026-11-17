@@ -82,6 +82,16 @@ class Terminal:
                 self.proc.write('\x1b[1;1R')
         return self.text()
 
+    def click(self, label):
+        # Locate terminal cells, not Python character offsets: Chinese occupies two columns.
+        for y in range(self.screen.lines):
+            for x in range(self.screen.columns):
+                value = ''.join(self.screen.buffer[y][c].data for c in range(x, self.screen.columns))
+                if value.startswith(label):
+                    self.proc.write(f'\x1b[<0;{x + 1};{y + 1}M\x1b[<0;{x + 1};{y + 1}m')
+                    return
+        raise AssertionError(f'Clickable label not visible: {label}')
+
     def resize(self, rows, columns):
         self.screen.resize(rows, columns)
         self.proc.setwinsize(rows, columns)
@@ -231,6 +241,7 @@ request_max_retries = 0
 stream_max_retries = 0
 [tui]
 intent_view = true
+fullscreen_transcript = true
 animations = false
 [features]
 code_mode = false
@@ -246,40 +257,63 @@ trust_level = "trusted"
     for key in ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_SANDBOX_NETWORK_DISABLED']:
         env.pop(key, None)
     cli = str(args.package.resolve() / 'bin/codex-intent.exe')
-    terminal = Terminal([cli, '--no-daemon', '--no-alt-screen', '执行 V2 子任务面板隔离验收。'], cwd, env, run, 'live')
+    terminal = Terminal([cli, '--no-daemon', '执行 V2 子任务面板隔离验收。'], cwd, env, run, 'live')
     report = {'status': 'running', 'package': str(args.package.resolve()), 'checks': []}
-    def row(text, name, status):
-        return any(name in line and '· ' + status in line for line in text.splitlines())
+    def row(text, name):
+        return any(re.fullmatch(r'\s*' + re.escape(name) + r'\s+(?:\d+:\d+|--:--)\s*', line) for line in text.splitlines())
+    def detail(name, expected):
+        terminal.click(name)
+        terminal.until(lambda text: '子任务详情' in text and expected in text)
+        terminal.save('details-' + name.replace(' ', '-'))
+        return terminal.text()
+    def close_detail():
+        terminal.proc.write('\x1b')
+        terminal.until(lambda text: '子任务详情' not in text)
     try:
-        terminal.until(lambda text: '子任务 (3)' in text and '核实冻结逻辑' in text and '正在核对状态事件' in text and '嵌套任务' in text)
+        terminal.until(lambda text: all(row(text, name) for name in ['freeze docs', 'runtime state', 'nested error']))
         terminal.save('parallel-running')
+        assert '任务说明未记录' not in terminal.text()
         assert not any(token in clean(terminal.output) for token in ['RAW_V2_', 'Started `/root/'])
-        report['checks'].append('parallel-and-nested-v2-purpose-real-progress-no-raw-tools')
+        detail('freeze docs', '正在查找笛卡尔规划')
+        assert '核实冻结逻辑与文档对应关系' in terminal.text()
+        close_detail()
+        detail('runtime state', '正在核对状态事件')
+        close_detail()
+        detail('nested error', '已定位嵌套任务')
+        close_detail()
+        report['checks'].append('parallel-and-nested-one-line-task-names-click-open-purpose-and-progress-esc-return')
         terminal.resize(36, 92)
         terminal.proc.write('\x1b[5~')
         gates['fail_nested'].set()
         (cwd / 'release-freeze-1').touch()
-        terminal.until(lambda text: row(text, 'freeze docs', '完成') and row(text, 'nested error', '失败'))
-        terminal.save('complete-and-failed')
-        frozen = next(line for line in terminal.text().splitlines() if 'freeze docs' in line and '· 完成' in line)
-        frozen_duration = re.search(r'\d+分\d+秒', frozen).group(0)
-        previous_screen = terminal.text()
-        terminal.until(lambda text: text != previous_screen)
-        still_done = next(line for line in terminal.text().splitlines() if 'freeze docs' in line and '· 完成' in line)
-        assert re.search(r'\d+分\d+秒', still_done).group(0) == frozen_duration
-        report['checks'].append('completed-duration-remains-frozen-across-updates')
-        report['checks'].append('completed-and-failed-status-from-real-turns')
+        detail('freeze docs', '已完成首次冻结逻辑核查')
+        terminal.until(lambda text: '· 完成 ·' in text)
+        frozen_duration = re.search(r'\d+分\d+秒', terminal.text()).group(0)
+        previous = terminal.text()
+        terminal.until(lambda text: text != previous)
+        assert re.search(r'\d+分\d+秒', terminal.text()).group(0) == frozen_duration
+        close_detail()
+        detail('nested error', '· 失败 ·')
+        close_detail()
+        report['checks'] += ['completed-duration-remains-frozen-across-updates', 'completed-and-failed-status-from-real-turns']
         gates['interrupt'].set()
-        terminal.until(lambda text: row(text, 'runtime state', '中断') and '正在复查冻结逻辑' in text and row(text, 'freeze docs', '运行中'))
-        terminal.save('interrupted-and-redispatched')
+        detail('runtime state', '· 中断 ·')
+        close_detail()
+        detail('freeze docs', '正在复查冻结逻辑')
         assert '复查冻结逻辑的边界条件' in terminal.text()
+        assert '· 运行中 ·' in terminal.text()
+        close_detail()
+        assert sum(row(line, 'freeze docs') for line in terminal.text().splitlines()) == 1
         report['checks'].append('interruption-and-redispatch-reuse-row-with-new-progress')
         (cwd / 'release-freeze-2').touch()
-        terminal.until(lambda text: row(text, 'freeze docs', '完成') and '已完成边界条件复查' in text)
-        terminal.save('redispatched-complete')
+        detail('freeze docs', '已完成边界条件复查')
+        terminal.until(lambda text: '· 完成 ·' in text)
+        close_detail()
         gates['final'].set()
-        terminal.until(lambda text: '已完成 V2 面板隔离验收' in text)
+        terminal.until(lambda text: '已完成 V2 面板隔离验收' in text and not any(row(text, name) for name in ['freeze docs', 'runtime state', 'nested error']))
+        terminal.save('finished-tasks-retired')
         assert 'RAW_V2_' not in clean(terminal.output)
+        report['checks'].append('parent-final-reply-retires-terminal-rows-without-losing-archive')
         report['checks'].append('resize-scroll-and-all-completed-output-keeps-raw-hidden')
         # Send an explicit paste followed by Enter. A fast plain-text burst plus Enter is
         # intentionally treated as a multiline paste by the upstream composer.
@@ -296,9 +330,16 @@ trust_level = "trusted"
         assert 'RAW_V2_' not in clean(terminal.output)
         report['checks'].append('opened-child-activity-preview-keeps-raw-commands-hidden')
         terminal.close()
-        terminal = Terminal([cli, 'resume', threads['/root'], '--no-daemon', '--no-alt-screen'], cwd, env, run, 'resumed')
-        terminal.until(lambda text: row(text, 'freeze docs', '完成') and row(text, 'runtime state', '中断') and row(text, 'nested error', '失败'))
-        terminal.save('resumed-statuses')
+        terminal = Terminal([cli, 'resume', threads['/root'], '--no-daemon'], cwd, env, run, 'resumed')
+        terminal.until(lambda text: '已完成 V2 面板隔离验收' in text)
+        terminal.proc.write('\x1b[200~/subagents\x1b[201~')
+        terminal.until(lambda text: any(line.startswith('› /subagents') for line in text.splitlines()))
+        terminal.proc.write('\r')
+        terminal.until(lambda text: 'freeze docs' in text and '完成' in text and 'runtime state' in text and '中断' in text)
+        terminal.save('resumed-archive-statuses')
+        terminal.proc.write('\x1b')
+        terminal.until(lambda text: 'Subagents' not in text and not any(row(text, name) for name in ['freeze docs', 'runtime state', 'nested error']))
+        terminal.save('resumed-retired-panel')
         assert 'RAW_V2_' not in clean(terminal.output)
         report['checks'].append('resume-preserves-terminal-statuses-and-intent-policy')
         report['status'] = 'passed-v2-terminal-probe-only'
